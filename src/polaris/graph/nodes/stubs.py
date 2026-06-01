@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from polaris.graph.compliance import apply_compliance
 from polaris.graph.nodes.trace import traced
 from polaris.graph.state import Citation
 
@@ -27,6 +28,13 @@ _STUB_CITATION = Citation(
 _STUB_DRAFT = (
     "（v0 假答案）依據引用來源，2025 Q1 營收 YoY 約 12.34%。"
     "本系統目前以 stub 假資料展示工作流骨架。"
+)
+
+#: US2 demo 用：含買賣建議的 stub 草稿，CLI `--stub-buysell` 與測試會用 monkeypatch
+#: 把 :func:`writer` 換成 :func:`writer_with_buysell`，驗證 Compliance 攔截行為。
+_BUYSELL_DRAFT = (
+    "（demo）依據法說會分析師說法，現在建議買進台積電。"
+    "本句僅供 W1 US2 攔截示範，正常 stub 路徑不會回此文字。"
 )
 
 
@@ -67,27 +75,46 @@ def calculator(state: dict[str, Any]) -> dict[str, Any]:
 
 @traced("writer")
 def writer(state: dict[str, Any]) -> dict[str, Any]:
-    """W1 D1：合規假草稿 + 1 條 stub citation。
-
-    US2 會新增 ``--stub-buysell`` 路徑讓本節點改回含買賣建議的草稿，
-    驗證 compliance 攔截行為；現階段（US1）只回合規版本。
-    """
+    """W1 D1：合規假草稿 + 1 條 stub citation。"""
     return {
         "draft": _STUB_DRAFT,
         "citations": [_STUB_CITATION],
     }
 
 
-@traced("compliance")
-def compliance(state: dict[str, Any]) -> dict[str, Any]:
-    """W1 D1 US1：passthrough — 把 draft 原封不動當 answer，標記 passed。
+@traced("writer")
+def writer_with_buysell(state: dict[str, Any]) -> dict[str, Any]:
+    """US2 demo：故意回含「建議買進」的草稿，驗證 Compliance 攔截。
 
-    US2 會引入 ``polaris.graph.compliance.apply_compliance`` 做 6 關鍵字攔截。
+    CLI ``--stub-buysell`` 旗標會用 :func:`build_workflow_with_buysell_writer`
+    或 monkeypatch 把 :func:`writer` 換成本函式。**正常路徑不會用到。**
     """
     return {
-        "answer": state.get("draft", ""),
-        "compliance_status": "passed",
+        "draft": _BUYSELL_DRAFT,
+        "citations": [_STUB_CITATION],
     }
 
 
-__all__ = ["planner", "retriever", "calculator", "writer", "compliance"]
+@traced("compliance")
+def compliance(state: dict[str, Any]) -> dict[str, Any]:
+    """US2：呼叫 :func:`polaris.graph.compliance.apply_compliance` 做 6 關鍵字攔截。
+
+    - 合規 → ``answer = draft``、``compliance_status = "passed"``
+    - 命中關鍵字 → ``answer = SAFE_MESSAGE``、``compliance_status = "blocked"``
+    """
+    draft = state.get("draft", "")
+    final, status = apply_compliance(draft)
+    return {
+        "answer": final,
+        "compliance_status": status,
+    }
+
+
+__all__ = [
+    "planner",
+    "retriever",
+    "calculator",
+    "writer",
+    "writer_with_buysell",
+    "compliance",
+]
