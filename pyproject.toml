@@ -2,7 +2,7 @@
 name = "polaris-desk"
 version = "0.1.0"
 description = "Polaris Desk — 台股法遵與投研 Agent-Augmented Research Workflow"
-requires-python = ">=3.11"
+requires-python = ">=3.13"   # 團隊統一用 Python 3.13 開發（見 .python-version）
 
 dependencies = [
     # 編排
@@ -44,4 +44,4 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"

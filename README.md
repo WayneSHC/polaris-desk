@@ -21,7 +21,14 @@
 
 ## 1. 本地起步（5 步）
 
+> **🐍 需求：Python 3.13**（團隊統一版本，已鎖在 `.python-version`）。
+> 用 `uv` 會自動依 `.python-version` 抓 3.13；手動指定：`uv venv --python 3.13`。
+> 沒裝 3.13 的話：`brew install python@3.13`（或 `uv python install 3.13`）。
+
 ```bash
+# 0) 建立 Python 3.13 虛擬環境（uv 會讀 .python-version）
+uv venv --python 3.13
+
 # 1) 複製設定檔，填入你的 API key
 cp .env.example .env
 #   打開 .env，至少填 GEMINI_API_KEY
