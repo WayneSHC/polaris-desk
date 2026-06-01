@@ -74,7 +74,27 @@ gh api -X PUT repos/<org-or-you>/polaris-desk/branches/main/protection \
 
 ## 5. 邀請隊友 + 收尾
 
-- [ ] Settings → Collaborators 邀 R1、R3、R4、R5、R6、R7
+**隊友 GitHub 帳號**（2026-06-01 收齊；你＝R2 施惠棋 是 repo owner，不用邀自己）：
+
+| 角色 | 姓名 | GitHub username |
+|---|---|---|
+| R1 PM | 郝家銘 | `hbb97tw-netizen` |
+| R3 Agent | 謝劼恩 | `officehsieh-afk` |
+| R4 資料 | 吳瑾瑜 | `holajennytw` |
+| R5 Eval | 楊宗勲 | `Arronyang0416` |
+| R6 金融品質 | 黃俊維 | `aa851115tw-tech` |
+| R7 Demo 前端 | 李靜雲 | `angelali2026888-blip` |
+
+- [ ] Settings → Collaborators 邀上表 6 人（R1、R3、R4、R5、R6、R7）
+
+或用 `gh` 一次邀完（write 權限，之後各自開 PR）：
+```bash
+REPO=<org-or-you>/polaris-desk
+for u in hbb97tw-netizen officehsieh-afk holajennytw Arronyang0416 aa851115tw-tech angelali2026888-blip; do
+  gh api -X PUT "repos/$REPO/collaborators/$u" -f permission=push && echo "invited $u"
+done
+```
+- [ ] 6 人都已邀請（GitHub Settings → Collaborators 看得到 6 個 pending/已接受）
 - [ ] 把 repo 連結貼進團隊群組（**只貼連結，不貼任何 key**）
 - [ ] 在 GitHub 開 `.env.example`，確認上面**沒有**任何真實值（只是範本）
 - [ ] 跟全隊講一次：金鑰只放各自本機 `.env`（已 gitignore）/ 雲端用 Secret Manager
