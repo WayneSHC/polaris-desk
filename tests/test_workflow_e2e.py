@@ -109,3 +109,67 @@ class TestE2ERuntime:
         elapsed = time.perf_counter() - start
         # stub mode 實際應 < 100ms；10 秒上限是 spec SC-004 的寬鬆預算
         assert elapsed < 10.0, f"e2e took {elapsed:.3f}s, exceeds 10s budget"
+
+
+# ---------------------------------------------------------------------------
+# T016 — US2 Compliance e2e（SC-003）
+# ---------------------------------------------------------------------------
+
+class TestE2EComplianceBlocks:
+    """End-to-end：writer 草稿含買賣建議 → compliance 節點攔截 → 最終 answer 為固定安全訊息。"""
+
+    def test_buysell_draft_results_in_blocked_safe_message(self, monkeypatch):
+        from polaris.graph.compliance import BUYSELL_KEYWORDS, SAFE_MESSAGE
+        from polaris.graph.nodes import stubs
+        from polaris.graph.nodes.trace import traced
+        from polaris.graph.state import Citation
+
+        @traced("writer")
+        def buysell_writer(state):
+            return {
+                "draft": "依據法說會分析，我建議買進台積電。",
+                "citations": [
+                    Citation(source_id="stub-x", snippet="snippet", origin="stub")
+                ],
+            }
+
+        monkeypatch.setattr(stubs, "writer", buysell_writer)
+
+        from polaris.graph.workflow import build_workflow
+
+        app = build_workflow()
+        result = app.invoke({"query": "should I buy TSMC now?"})
+
+        # SC-003：最終 answer 不可含任何 6 條關鍵字
+        ans = result.get("answer", "")
+        for kw in BUYSELL_KEYWORDS:
+            assert kw not in ans, f"final answer contains forbidden keyword: {kw!r}"
+        assert ans == SAFE_MESSAGE
+        assert result.get("compliance_status") == "blocked"
+
+    def test_compliance_node_executes_normally_on_block(self, monkeypatch):
+        """compliance 節點本身是 status=ok 跑完攔截、不是 error。trace 仍 5 筆全 ok。"""
+        from polaris.graph.nodes import stubs
+        from polaris.graph.nodes.trace import traced
+        from polaris.graph.state import Citation
+
+        @traced("writer")
+        def buysell_writer(state):
+            return {
+                "draft": "加碼台積電的好時機。",
+                "citations": [
+                    Citation(source_id="stub-x", snippet="snippet", origin="stub")
+                ],
+            }
+
+        monkeypatch.setattr(stubs, "writer", buysell_writer)
+
+        from polaris.graph.workflow import build_workflow
+
+        app = build_workflow()
+        result = app.invoke({"query": "q"})
+
+        names = [t.node_name for t in result.get("trace", [])]
+        assert names == ["planner", "retriever", "calculator", "writer", "compliance"]
+        assert all(t.status == "ok" for t in result["trace"])
+        assert not result.get("halt", False)

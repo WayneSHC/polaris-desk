@@ -35,8 +35,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _cmd_ask(query: str, *, stub_buysell: bool = False) -> int:
-    # 注意：W1 D1 US1 階段 --stub-buysell 只是 reserved flag，
-    # 實際攔截行為由 US2 的 compliance.py 接上。
+    if stub_buysell:
+        # US2 demo：把 writer 模組屬性換成會回「建議買進」的版本。
+        # 這跟測試用 monkeypatch.setattr(stubs, "writer", ...) 是對稱的做法。
+        # CLI 跑完即退出，全域狀態變更不外溢。
+        from polaris.graph.nodes import stubs
+        stubs.writer = stubs.writer_with_buysell  # type: ignore[assignment]
+
     from polaris.graph.workflow import build_workflow
 
     app = build_workflow()
