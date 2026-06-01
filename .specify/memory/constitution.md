@@ -1,58 +1,135 @@
 # Polaris Desk Constitution
 
 > 北辰（Polaris Desk）— 台灣資本市場 Agent-Augmented Research Workflow。
-> 本憲法凌駕所有任務 / 計畫 / PR；任何違反即為 **No-Go**。對應團隊規格：
-> Google Drive `Polaris Desk/03_規格書_PRD/spec-kit/`（專題 spec + 7 角色 spec）。
+> 這份憲法是專題開發的**最高守則**。任務、計畫、PR 跟它衝突，一律以它為準。
+> 違反 = **No-Go**：停下、改方案、不硬幹。
+> 完整團隊規格在 Google Drive `Polaris Desk/03_規格書_PRD/spec-kit/`
+>（含專題 spec + 7 角色 spec）。
 
 ## Core Principles
 
 ### I. 合規紅線 — NFR-031（NON-NEGOTIABLE）
-新聞 / 投研功能**只描述、標證據、標矛盾，不得產出任何買賣建議**（投顧執照風險）。
-所有對外輸出皆受此約束；Compliance 節點 / Watchdog / 新聞卡都必須攔截買賣建議，
-目標：130 題 + 4 場景 + 紅隊題中**買賣建議 = 0**。違反 = 直接砍該輸出。
+
+我們**沒有投顧執照**。任何對外輸出（新聞卡、投研摘要、Watchdog 警報、Deep Research 報告）
+**只准做三件事**：描述事實、標出來源、標出矛盾。
+
+**不准出現**這 6 個字眼（W1 D1 攔截清單）：
+建議買進、建議賣出、加碼、減碼、看多、看空。
+R6 W3 會補完整關鍵字 / regex / 紅隊測試。
+
+防線分三層：
+- **Compliance 節點**：每個答案出去前的最後關卡，命中關鍵字 → 改回固定訊息「本系統不提供買賣建議，僅描述事實與引用來源。」
+- **Watchdog Agent**：事件驅動掃描所有對外輸出（W3 上線）
+- **新聞卡 UI**：前端再過一次（W4）
+
+**達標數字**：130 題 + 4 場景 + 紅隊測試中，買賣建議出現次數 = **0**。
+**違反處置**：直接砍該輸出 + 寫 incident report + 補測試（防回歸）。
 
 ### II. 引用接地 — Grounding（NON-NEGOTIABLE）
-每一句結論、每個數字都必須可追溯到來源（法說稿頁碼 / 新聞出處 / 財報欄位）。
-無來源的宣稱不得輸出；來源矛盾時**標出矛盾**並列雙方出處，不替使用者下結論。
+
+每一句結論、每一個數字都要能查到來源（法說稿頁碼 / 新聞 URL / 財報欄位）。
+**沒來源就絕不輸出**——寧可說「資料不足」也不要瞎掰。
+
+來源彼此矛盾時：
+- 不要替使用者下結論
+- 兩邊都列出來，標明矛盾在哪
+- 讓使用者自己判斷
+
+為什麼這條 NON-NEGOTIABLE：我們是**輔助工具**，不是預言家。
+使用者要能驗證、能反駁、能追到底——做不到這點，這套系統就跟「會幻覺的 chatbot」沒兩樣。
 
 ### III. 本地優先 · 金鑰安全
-開發先本地（pgvector）省雲費（Q-03）；金鑰只放 `.env` / GCP Secret Manager，
-**永不 commit、不貼群組、不丟 Drive**（Q-10）。`.env` 已 gitignore。
+
+**本地優先**（決策 Q-03）：W1–W3 用 pgvector 在本機跑，W4 才切 BigQuery。
+- 為什麼：學雲端的學費繳一次就好，不必把 4 週都泡在 GCP 上
+- W2 Day 10 先做 BigQuery 煙測（不搬家），確認 768 維 / cosine 兩邊一致再正式切
+
+**金鑰絕對只放兩個地方**：本機 `.env` 或 GCP Secret Manager。
+- ❌ 不准 commit、不准貼群組、不准丟 Drive、不准截圖到簡報（決策 Q-10）
+- ✅ `.env` 已經 gitignore 了，自己別覆寫
+- 萬一外洩：**立刻 revoke 重發**——光從 git 刪掉不夠，歷史還在、可能已被爬
 
 ### IV. Eval 即品質門檻
-功能「好不好」以 Ragas + 三方 Judge 客觀分數為準，不以主觀感覺放行。
-硬門檻：Context Precision ≥ 0.85、Faithfulness ≥ 0.90、Answer Relevance ≥ 0.85；
-130 題達標率 ≥ 80%（G3）。平常 CI 用 1 個便宜模型，三方 Judge 只在閘門跑（省 token）。
+
+功能「好不好」**以分數為準，不以感覺為準**。
+- 為什麼：「我覺得還不錯」沒法跨人比較、過閘門時翻車最丟臉
+- 工具：Ragas（自動化）+ 三方 Judge（Claude Opus 4.7 / GPT-5 / Gemini 3 Pro 投票）
+
+**硬門檻**（任一不達標 = G3 No-Go）：
+- Context Precision ≥ 0.85
+- Faithfulness ≥ 0.90
+- Answer Relevance ≥ 0.85
+- 130 題達標率 ≥ 80%
+
+**Token 紀律**（防止 eval 把預算燒光）：
+- 平常 CI：1 個便宜模型跑一次（Gemini 3 Flash）
+- 閘門驗收：才動用三方 Judge
 
 ### V. Demo 可重現 + 離線備援
-Demo 跑**雲端**（Cloud Run + BigQuery + Vercel），但必須有「本地 pgvector + 預錄影片」
-的 Plan B；同一場景跑 10 次結果一致；斷網可於 < 30 秒切離線備援。
+
+Demo Day 正餐跑**雲端**（Cloud Run + BigQuery + Vercel），但**必須有 Plan B**。
+
+階梯式備援：
+1. **Plan A**：雲端正常跑（首選）
+2. **Plan B**：本機 pgvector + 同一份 demo（雲端斷網時切回）
+3. **Plan C**：預錄影片（連本機都壞時的最後保險）
+
+**承諾**：同一場景連跑 10 次結果一致；斷網切離線備援 **< 30 秒**。
 
 ### VI. 最新技術棧
-Gemini 用新版 `google-genai` SDK（`from google import genai; genai.Client()`）+
-模型 `gemini-3-pro-preview` / `gemini-3-flash-preview`；嵌入 `gemini-embedding-2`（多模態、768 維、cosine）。
-**不得**用已淘汰的 `google-generativeai` / `genai.configure`。Rerank 用 Cohere `client.v2.rerank`（`rerank-v4.0`）。
+
+技術選型已拍板，**不准用舊版 SDK**——舊版能跑但被標 deprecated，
+未來會壞、晚換不如早換。
+
+**Gemini**：
+- ✅ 新版 SDK：`from google import genai; genai.Client()`
+- ❌ 已淘汰：`google-generativeai` / `genai.configure`
+- 模型：`gemini-3-pro-preview` / `gemini-3-flash-preview`
+- 嵌入：`gemini-embedding-2`（多模態、768 維、cosine 距離）
+
+**Rerank**：Cohere `client.v2.rerank`（model = `rerank-v4.0`）
+
+例外處理：若某個版本確實不能用，在 PR 寫清楚理由，PM (R1) + Tech Lead (R2) 雙簽才能降版。
 
 ## Additional Constraints — 技術棧與成本
 
-- 編排 LangGraph（StateGraph）；檢索 4-way（BM25 + 向量 + ColPali + Cohere Rerank）+ 新聞第 5 路。
-- 向量庫經 `VectorStore` 介面抽象：`VECTOR_BACKEND=pgvector`（W1-W3）→ `bigquery`（W4 上雲）；維度 768、距離 cosine 兩端一致，切換後重跑同一份 eval 驗證。
-- pgvector 查詢必須用 `<=>`（cosine）+ `ORDER BY <=> LIMIT k` 才走 HNSW 索引（見 `scripts/init_pgvector.sql` 註解）。
-- 預算 ~$400 USD，大頭是 LLM token（非 GCP infra）；設預算警報、embedding 算一次重用、ColPali 用免費 GPU。
+- **編排**：LangGraph（StateGraph）
+- **檢索**：4-way（BM25 + 向量 + ColPali + Cohere Rerank）+ 新聞第 5 路
+- **向量庫**：經 `VectorStore` 介面抽象
+  - `VECTOR_BACKEND=pgvector`（W1–W3 本地）
+  - `VECTOR_BACKEND=bigquery`（W4 上雲）
+  - 維度 768、距離 cosine **兩端一致**，切換後跑同一份 eval 驗證
+- **pgvector 查詢一定要用 `<=>`**（cosine 算子）
+  - 用錯算子（`<->` 歐式 / `<#>` 內積）會全表掃描，速度跟 BigQuery 比差千倍
+  - `ORDER BY embedding <=> $q LIMIT k` 才走 HNSW 索引
+  - 詳見 `scripts/init_pgvector.sql` 註解
+- **預算上限 ~$400 USD**
+  - 大頭是 **LLM token**，不是 GCP infra（GCP 多數服務有免費額度）
+  - 設預算警報
+  - Embedding 算一次就重用、不重複呼叫
+  - ColPali 模型試跑用 Colab / Kaggle 免費 GPU
 
 ## Development Workflow — Go / No-Go 閘
 
-- **G1 (Day 5)**：Ontology v1 凍結 + 100 份入庫本地 pgvector。
-- **G2 (Day 10)**：e2e Workflow 跑通 + Ragas 管線上線 + BigQuery 煙測通過（Q-03）。
-- **G3 (Day 17)**：ColPali/LLMLingua 整合 + Eval ≥ 80% + Deep Research + Watchdog 可跑。
-- **G4 (Day 24)**：4 場景在雲端可重現 + 離線備援 + Watchdog 上線 + Eval ≥ 80%。
-- **Demo (Day 28)**：5 分鐘無斷點，斷網切預錄。
-- 過閘沒過即啟動 PRD §5.4 降級方案，不硬撐。
+每個閘門過不了就**啟動降級方案，不硬撐**——避免硬撐到 Demo Day 翻車最丟臉。
+
+- **G1 (Day 5)**：Ontology v1 凍結 + 100 份 PDF 入庫本地 pgvector
+- **G2 (Day 10)**：e2e Workflow 跑通 + Ragas 管線上線 + BigQuery 煙測通過（決策 Q-03）
+- **G3 (Day 17)**：ColPali / LLMLingua 整合 + Eval ≥ 80% + Deep Research + Watchdog 可跑
+- **G4 (Day 24)**：4 場景在**雲端**可重現 + 離線備援可切 + Watchdog 上線 + Eval ≥ 80%
+- **Demo Day (Day 28)**：5 分鐘無斷點，斷網切預錄
+
+降級方案見 PRD §5.4。
 
 ## Governance
 
-本憲法凌駕所有其他實作慣例。所有 PR / review 必須驗證合規（特別是 I、II、III）。
-修訂需經 PM（R1）+ Tech Lead（R2）同意並記入 `01_PM_Notion匯入/決策追蹤.csv`。
-複雜度須被正當化；runtime 開發指引見 repo `README.md` 與 `CLAUDE.md`。
+本憲法**凌駕**所有其他實作慣例與口頭約定。
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-31 | **Last Amended**: 2026-05-31
+- 所有 PR 必須在 review 時確認**合規**，特別是 I、II、III 三條
+- 修訂憲法：需經 **PM (R1) + Tech Lead (R2) 雙簽**，並記錄到 `01_PM_Notion匯入/決策追蹤.csv`
+- 複雜度需要被正當化：加抽象、加 layer、加套件前要說清楚為什麼非加不可
+- Runtime 開發指引見 repo `README.md` 與 `CLAUDE.md`
+
+---
+
+**Version**: 1.0.1 | **Ratified**: 2026-05-31 | **Last Amended**: 2026-06-01
