@@ -22,17 +22,23 @@ pip install -e ".[dev]"
 
 預期：langgraph、pydantic、pytest 安裝完成。其他套件（google-genai、psycopg 等）會一併安裝，但本 feature **不會 import**。
 
-## 2) 跑 e2e 測試（30 秒）
+## 2) 跑 e2e 測試（< 1 秒）
 
 ```bash
-pytest tests/test_workflow_e2e.py -v
+pytest tests/test_workflow_e2e.py tests/test_workflow_edges.py -v
 ```
 
-預期：4 個測試全綠：
-- `test_e2e_happy_path` — 端到端跑通、5 trace、citations ≥ 1
-- `test_e2e_determinism` — 同一問題跑 3 次，結果完全相同
-- `test_e2e_compliance_blocks_buy_sell` — Writer 草稿含「建議買進」時，最終 answer 不含任何 6 關鍵字
-- `test_e2e_runtime_under_10s` — 總耗時 < 10 秒
+預期：15 個測試全綠，分 5 個 class：
+
+| Class | 測試數 | 對應 spec |
+|---|---|---|
+| `TestE2EHappyPath` | 5 | SC-001 / SC-002（端到端跑通、5 節點 trace 齊全、citations ≥ 1） |
+| `TestE2EDeterminism` | 2 | SC-006（同問題連跑 3 次 byte-identical） |
+| `TestE2ERuntime` | 1 | SC-004（總耗時 < 10 秒） |
+| `TestE2EComplianceBlocks` | 2 | SC-003（買賣建議草稿被攔成 SAFE_MESSAGE） |
+| `TestEmptyQuery` + `TestNodeException` | 4 + 3 | SC-007 / FR-008 / FR-009（halt 行為） |
+
+整套 70 個測試一鍵跑：`pytest`（含 vectorstore / state / trace / compliance / node swap）。
 
 ## 3) CLI 跑一個範例問題
 
@@ -40,37 +46,41 @@ pytest tests/test_workflow_e2e.py -v
 python -m polaris.cli ask "台積電 2025 Q1 營收 YoY 是多少？"
 ```
 
-預期輸出（簡化版）：
+預期輸出：
 
 ```text
 == Polaris Desk (W1 D1 stub mode) ==
-Query: 台積電 2025 Q1 營收 YoY 是多少？
-Answer: （v0 假答案）依據 stub citation，2025 Q1 YoY 約 12.34%。
-Citations:
-  [1] stub-tsmc-2025Q1-001 — "...stub snippet..."
+Query     : '台積電 2025 Q1 營收 YoY 是多少？'
+Answer    : （v0 假答案）依據引用來源，2025 Q1 營收 YoY 約 12.34%。本系統目前以 stub 假資料展示工作流骨架。
 Compliance: passed
-Trace:
-  planner    ok    0ms   in:[query]               out:[plan]
-  retriever  ok    0ms   in:[query,plan]          out:[contexts]
-  calculator ok    0ms   in:[query,plan,contexts] out:[calculations]
-  writer     ok    0ms   in:[..]                  out:[draft,answer,citations]
-  compliance ok    0ms   in:[..,draft]            out:[answer,compliance_status]
+Citations :
+  [1] stub-tsmc-2025Q1-001 — "（v0 stub）法說頁碼 X：營收 YYY 億元，YoY 約 12.34%。" (origin=stub)
+Trace     :
+  planner     ok         0ms  in=['query', 'trace']  out=['plan']
+  retriever   ok         0ms  in=['plan', 'query', 'trace']  out=['contexts']
+  calculator  ok         0ms  in=['contexts', 'plan', 'query', 'trace']  out=['calculations']
+  writer      ok         0ms  in=['calculations', 'contexts', 'plan', 'query', 'trace']  out=['citations', 'draft']
+  compliance  ok         0ms  in=['calculations', 'citations', 'contexts', 'draft', 'plan', 'query', 'trace']  out=['answer', 'compliance_status']
 ```
+
+> 註：trace 的 `in=[...]` 永遠包含 `trace`，那是 `@traced` 裝飾器自己 emit 的 state 累加欄位（LangGraph reducer 用），不是節點業務輸入。
 
 ## 4) 看看「攔截買賣建議」實際長怎樣
 
-CLI 模式有個內建測試開關 `--stub-buysell` 把 Writer 改成回固定的「建議買進」草稿：
+CLI 內建測試旗標 `--stub-buysell` 會把 writer 換成固定回「建議買進台積電」的版本：
 
 ```bash
 python -m polaris.cli ask "你看好台積電嗎？" --stub-buysell
 ```
 
-預期 answer：
+預期關鍵欄位：
 
 ```text
-Answer: 本系統不提供買賣建議，僅描述事實與引用來源。
+Answer    : 本系統不提供買賣建議，僅描述事實與引用來源。
 Compliance: blocked
 ```
+
+5 個節點 trace 仍全 ok（compliance 節點是「正常跑完攔截」，非 error）。
 
 ## 5) 看看「空輸入守門」
 
@@ -78,12 +88,17 @@ Compliance: blocked
 python -m polaris.cli ask ""
 ```
 
-預期：
+預期關鍵欄位：
 
 ```text
-Answer: 請提供具體問題。
-Trace: 只有 planner 1 筆（status=error）
+Answer    : 請提供具體問題。
+Compliance: unknown
+Halt      : True
+Trace     :
+  planner     error      0ms  in=['query', 'trace']  out=[]  error=ValueError: empty query
 ```
+
+下游 4 節點不出現在 trace（halt 後條件邊直接跳 terminal 節點，對應 SC-007）。
 
 ## 給隊友的對接指引
 

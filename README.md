@@ -118,6 +118,22 @@ docker run --env-file .env -p 8000:8000 polaris-desk
 
 > 先讀 `docs/spec-kit/README.md`。改 spec 以本 repo 版為準，再同步回 Drive。
 
+### W1 D1 已交付：`specs/001-langgraph-skeleton/`
+
+5 節點 LangGraph 骨架（stub mode）— US1 + US2 + US3 全綠（70/70 tests）。
+
+| 檔 | 內容 |
+|---|---|
+| `spec.md` | 3 個 user story、10 條 FR、7 條可量測 SC |
+| `plan.md` | 技術計畫 + Constitution Check（6 原則 ALL PASS） |
+| `research.md` | 4 個技術決策（節點拆分 / @traced / 例外處理 / Compliance） |
+| `data-model.md` | `Citation` / `NodeTrace` / `ResearchState` |
+| `contracts/workflow-invoke.md` | `app.invoke()` 對外契約 + versioning |
+| `tasks.md` | 26 個任務（4 階段 + Polish）、依賴圖、平行機會 |
+| **`quickstart.md`** | **5 分鐘讓任何隊友把骨架跑起來** ← 隊友從這開始 |
+
+跑法：`pip install -e ".[dev]"` → `pytest` → `python -m polaris.cli ask "..."`。詳見 `specs/001-langgraph-skeleton/quickstart.md`。
+
 ---
 
 _對應文件：4 週航程作戰計畫 §W1 / Notion 開工清單與本地上雲指南 / PRD v1.1.1 §18 Data Model_

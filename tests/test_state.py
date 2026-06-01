@@ -4,7 +4,6 @@
 """
 from __future__ import annotations
 
-import operator
 from typing import get_type_hints
 
 import pytest
@@ -160,7 +159,7 @@ class TestResearchState:
         """trace 欄位必須是 Annotated[list[NodeTrace], operator.add]，
         否則 LangGraph 不會累加多次 patch — 直接破 FR-006 + SC-002。
         """
-        from polaris.graph.state import ResearchState, NodeTrace
+        from polaris.graph.state import ResearchState
         hints = get_type_hints(ResearchState, include_extras=True)
         trace_hint = hints["trace"]
         # Annotated 物件的 metadata 在 __metadata__
