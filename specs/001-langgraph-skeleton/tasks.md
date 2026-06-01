@@ -58,7 +58,7 @@ description: "Task list for LangGraph 5-Node Skeleton (Stub Mode) — R2 W1 D1"
 - [ ] T007 [P] [US1] Write `tests/test_workflow_e2e.py::test_e2e_determinism`：同一 query 連跑 3 次，比較 3 個 result dict，**排除每筆 trace 的 `elapsed_ms`** 後其餘 byte-identical（SC-006）
 - [ ] T008 [P] [US1] Write `tests/test_workflow_e2e.py::test_e2e_runtime_under_10s`：跑一次 happy path 計時 < 10 秒（用 `time.perf_counter()`）（SC-004）
 - [ ] T009 [P] [US1] Write `tests/test_workflow_edges.py::test_empty_query_halts`：`app.invoke({"query": ""})` 與 `app.invoke({"query": "   "})` → 斷言 `halt=True`、`answer="請提供具體問題。"`、`trace` 只有 1 筆 planner status=error（SC-007、FR-008）
-- [ ] T010 [P] [US1] Write `tests/test_workflow_edges.py::test_node_exception_halts_downstream`：用 monkeypatch 把 `nodes.stubs.retriever` 換成會 `raise RuntimeError("boom")` 的版本 → 斷言 (a) `app.invoke()` 不拋例外、(b) `halt=True`、(c) `trace` 有 planner ok + retriever error + calculator/writer/compliance 3 筆 status=skipped（FR-009）
+- [ ] T010 [P] [US1] Write `tests/test_workflow_edges.py::test_node_exception_halts_downstream`：用 monkeypatch 把 `nodes.stubs.retriever` 換成會 `raise RuntimeError("boom")` 的版本 → 斷言 (a) `app.invoke()` 不拋例外、(b) `halt=True`、(c) `trace` 只含 planner ok + retriever error **共 2 筆**（halt 後條件邊直接跳 terminal，下游 calculator/writer/compliance **不出現在 trace**，對齊 SC-007 精神）（FR-009）
 
 ### Implementation for User Story 1
 

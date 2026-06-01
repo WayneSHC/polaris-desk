@@ -23,13 +23,13 @@
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `node_name` | `str` | yes | `"planner"` / `"retriever"` / `"calculator"` / `"writer"` / `"compliance"` |
-| `status` | `Literal["ok","error","skipped"]` | yes | 正常完成 / 例外 / 因 halt 被跳過 |
+| `status` | `Literal["ok","error","skipped"]` | yes | 正常完成 / 例外 / 保留欄位（W1 D1 不使用 `skipped`） |
 | `input_keys` | `list[str]` | yes | 節點進入時的 state keys 排序 |
 | `output_keys` | `list[str]` | yes | 節點返回 state patch 的 keys 排序 |
 | `error_message` | `str \| None` | no | `status="error"` 時必填，其餘為 None |
 | `elapsed_ms` | `int` | yes | 從進入到返回（含例外）的 wall-clock 毫秒 |
 
-**State transitions**：節點未開始 → `ok` / `error`；若上游 halt 則 `skipped`（不執行函式，仍寫一筆 trace 標記跳過原因）。
+**State transitions**：節點未開始 → `ok` / `error`。`skipped` 為保留枚舉，**W1 D1 實作不使用**——任一節點 halt 後，conditional edge 直接跳 `terminal` 節點，下游節點**不執行也不出現在 trace**（對應 spec SC-007）。預留 `skipped` 是給未來若加上「明示跳過某節點」（例如 W2 retry 失敗後標記）的可能。
 
 ## ResearchState（TypedDict，LangGraph state）
 
@@ -46,7 +46,7 @@
 | `citations` | `list[Citation]` | writer | 引用清單（≥ 1 條 stub citation） |
 | `compliance_status` | `Literal["passed","blocked","rewritten","unknown"]` | compliance | `passed` / `blocked` 為 W1 用；`rewritten` 預留 R6 W3；`unknown` 用於 halt |
 | `trace` | `Annotated[list[NodeTrace], operator.add]` | every node (via decorator) | LangGraph reducer 自動 append；不可被覆蓋 |
-| `halt` | `bool` | any node on error | 任一節點掛掉時設 True，conditional edge 跳 END |
+| `halt` | `bool` | any node on error | 任一節點掛掉時設 True，conditional edge 直接跳 `terminal` 節點 → END（下游節點不執行、不出現在 trace） |
 
 **Backwards compatibility**：
 - 既有 starter `workflow.py` 的 `PolarisState` 留 `compliance_ok: bool` 欄位（被 `compliance_status` 取代），W1 D1 staging 期同時填兩個，後續 PR 拿掉 `compliance_ok`。
@@ -84,7 +84,7 @@
 - `halt` = True
 - `answer` = `"處理過程發生錯誤（節點：retriever），請查看 trace 細節。"`
 - `compliance_status` = `"unknown"`
-- `trace` 含 1 筆 planner ok + 1 筆 retriever error；calculator / writer / compliance 各 1 筆 `status="skipped"`
+- `trace` 含 1 筆 planner ok + 1 筆 retriever error，**僅此 2 筆**；calculator / writer / compliance 因 halt 條件邊直接跳 `terminal` 節點而未執行，**不出現在 trace**（對應 spec SC-007 對空輸入 halt 的「下游 4 節點 status 不存在」精神，此處延伸到任一節點 halt）
 
 ## Question（W1 純概念，不獨立 model）
 

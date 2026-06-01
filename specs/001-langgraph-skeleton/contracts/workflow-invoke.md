@@ -29,7 +29,7 @@ result = app.invoke({"query": "台積電 2025 Q1 營收 YoY"})
 | `answer` | `str` | 最終要顯示給使用者的文字（已過 compliance） |
 | `citations` | `list[Citation]` | ≥ 1 條引用（W1 stub 含 1 條固定 citation） |
 | `compliance_status` | `Literal["passed","blocked","rewritten","unknown"]` | W1 D1 出現的值：`passed` 或 `blocked` 或 `unknown`（halt 時） |
-| `trace` | `list[NodeTrace]` | 完整 5 筆（正常）或 mixed（halt 時下游 skipped） |
+| `trace` | `list[NodeTrace]` | 完整 5 筆（正常路徑）；halt 時為「成功節點 + 失敗節點」共 N 筆（無下游 skipped 條目，halt 後條件邊直接跳 terminal） |
 | `halt` | `bool` | True = 中斷路徑；False = 正常完成 |
 | `plan`, `contexts`, `calculations`, `draft` | various | 各節點輸出，供 debug / R3 替換時驗證用 |
 
@@ -84,16 +84,16 @@ result = app.invoke({"query": "台積電 2025 Q1 營收 YoY"})
     "trace": [
         NodeTrace(node_name="planner", status="ok", ...),
         NodeTrace(node_name="retriever", status="error", error_message="<exception text>", ...),
-        NodeTrace(node_name="calculator", status="skipped", ...),
-        NodeTrace(node_name="writer", status="skipped", ...),
-        NodeTrace(node_name="compliance", status="skipped", ...),
+        # ← 下游 calculator / writer / compliance 不出現
+        #    （halt 後條件邊直接跳 terminal 節點，下游節點未被執行）
     ],
 }
 ```
 
 合約承諾：
 - 例外不會 propagate 出 `app.invoke()`（呼叫端不需要 try/except）
-- 下游節點不會被執行（`status="skipped"` 是只記 trace 不跑函式）
+- 下游節點不會被執行，且**不出現在 trace 中**（halt 後條件邊直接跳 `terminal` 節點 → END）
+- `NodeTrace` 的 `status="skipped"` 是保留枚舉，W1 D1 實作不使用
 
 ## Determinism guarantee
 
