@@ -1,0 +1,12 @@
+# Polaris Desk — Antigravity / Gemini 規則
+
+> Google **Antigravity** 與 **Gemini CLI** 讀本檔。
+> **完整跨工具守則見 [`AGENTS.md`](./AGENTS.md)（單一事實來源）** —— 本檔只列關鍵紅線，細節以 AGENTS.md 為準。
+
+關鍵紅線：
+
+- 🐍 開發一律用 **Python 3.13**（`.python-version` 已鎖；建環境 `uv venv --python 3.13 && uv pip install -e ".[dev]"`）。
+- 🔴 **NFR-031**：不得產出任何買賣建議。
+- 🔑 **金鑰**只放 `.env` / Secret Manager，永不 commit。
+- **技術棧**：`google-genai` 新 SDK + `gemini-3-*-preview` + `gemini-embedding-2`（768/cosine）。
+- **不直接推 `main`**：開分支 → PR → 1 人 review → 合。

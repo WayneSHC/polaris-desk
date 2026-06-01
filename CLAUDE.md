@@ -6,6 +6,9 @@ shell commands, and other important information, read the current plan:
 
 # Polaris Desk — 給 coding agent 的專案守則
 
+> 跨工具單一事實來源＝ [`AGENTS.md`](./AGENTS.md)（Codex / Antigravity / Cursor 讀它）。
+> 本檔為 **Claude Code** 鏡像；改規則時請同步 `AGENTS.md`（與 `GEMINI.md`）。
+
 **權威規格**：repo 內 `.specify/memory/constitution.md`（憲法）；團隊完整規格在
 Google Drive `Polaris Desk/03_規格書_PRD/spec-kit/`（專題 spec + 7 角色 spec）。
 
