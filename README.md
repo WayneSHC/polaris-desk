@@ -25,6 +25,8 @@
 > 用 `uv` 會自動依 `.python-version` 抓 3.13；手動指定：`uv venv --python 3.13`。
 > 沒裝 3.13 的話：`brew install python@3.13`（或 `uv python install 3.13`）。
 
+**懶人一鍵**：`make setup`（建 3.13 venv + 裝依賴 + 產生 `.env` 範本），再填 `.env` → `make db-up` → `make test`。下面是手動逐步版：
+
 ```bash
 # 0) 建立 Python 3.13 虛擬環境（uv 會讀 .python-version）
 uv venv --python 3.13

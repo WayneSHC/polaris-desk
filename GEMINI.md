@@ -5,7 +5,8 @@
 
 關鍵紅線：
 
-- 🐍 開發一律用 **Python 3.13**（`.python-version` 已鎖；建環境 `uv venv --python 3.13 && uv pip install -e ".[dev]"`）。
+- 🚀 建環境一鍵：**`make setup`**（建 Python 3.13 venv + 裝依賴 + `.env` 範本）。
+- 🐍 開發一律用 **Python 3.13**（`.python-version` 已鎖）。
 - 🔴 **NFR-031**：不得產出任何買賣建議。
 - 🔑 **金鑰**只放 `.env` / Secret Manager，永不 commit。
 - **技術棧**：`google-genai` 新 SDK + `gemini-3-*-preview` + `gemini-embedding-2`（768/cosine）。

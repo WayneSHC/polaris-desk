@@ -5,6 +5,18 @@
 > Claude Code 讀 `CLAUDE.md`、Antigravity 另讀 `GEMINI.md` —— 那兩個是本檔的鏡像／指標。
 > **要改規則，請改這裡（AGENTS.md），再同步另外兩個檔。**
 
+## 🚀 一鍵建環境（Setup）
+
+第一次進專案（**人或 AI agent 都一樣**），在 repo 根目錄跑：
+
+```bash
+make setup     # 建 Python 3.13 venv + 裝依賴 + 產生 .env 範本（idempotent，可重跑）
+```
+
+然後：① 打開 `.env` 填 `GEMINI_API_KEY`（**金鑰自己填，agent 不要碰**）② `make db-up`（起本地 pgvector）③ `make test`（基準：70 passed）。
+
+> `make test` / `make lint` 走 `uv run`，**不需先 `activate` venv**。沒有 `make` 時的等效手動指令見下方「Python 3.13」段。
+
 ## 🐍 Python 3.13（最重要的環境約束）
 
 - 開發 / CI 一律用 **Python 3.13**。版本已鎖在 `.python-version`（uv / pyenv 會自動選），`pyproject.toml` 也設 `requires-python>=3.13`。
