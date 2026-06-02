@@ -21,11 +21,11 @@
 ## 3. Tasks by Week（可勾選）
 
 **W1**
-- [ ] D1 LangGraph 骨架：5 空節點、每節點先回假資料
-- [ ] D2 Planner Agent v0：把問題拆成步驟
-- [ ] D3 Calculator + Writer v0
-- [ ] D4 LangGraph 縫合：端到端跑一次
-- [ ] D5 G1 驗收（架構面）／GCP·Gemini key 全隊可用
+- [x] D1 LangGraph 骨架：5 空節點、每節點先回假資料
+- [x] D2 Planner Agent v0：把問題拆成步驟 — `nodes/planner_agent.py`（Gemini Flash + 確定性 fallback）
+- [x] D3 Calculator + Writer v0 — Writer `nodes/writer_agent.py`（接地引用）；Calculator 確定性 v0（待 R4 資料）
+- [x] D4 LangGraph 縫合：端到端跑一次 — `python -m polaris ask` / `python -m polaris.cli ask`（114 tests green）
+- [~] D5 G1 驗收（架構面）／GCP·Gemini key 全隊可用 — 工具/文件就緒（`make check-keys`、`docs/keys-setup.md`、`docs/G1_readiness.md`）；**待全員自填金鑰 + 站會過閘**
 
 **W2**
 - [ ] D6 Temporal Anchoring
