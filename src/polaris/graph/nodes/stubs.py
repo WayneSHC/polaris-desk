@@ -11,8 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 from polaris.graph.compliance import apply_compliance
+from polaris.graph.nodes import planner_agent
 from polaris.graph.nodes.trace import traced
 from polaris.graph.state import Citation
+from polaris.llm.gemini import active_llm
 
 
 # ---------------------------------------------------------------------------
@@ -44,14 +46,16 @@ _BUYSELL_DRAFT = (
 
 @traced("planner")
 def planner(state: dict[str, Any]) -> dict[str, Any]:
-    """FR-008：空字串 / 全空白 query → raise，讓 @traced 設 halt=True。
+    """Planner Agent v0（R2 W1 D2）。
 
-    其餘情況回固定 3 步驟計畫。
+    - FR-008：空字串 / 全空白 query → raise，讓 @traced 設 halt=True。
+    - 否則用 :func:`planner_agent.make_plan` 拆步驟（有金鑰走 Gemini Flash、
+      否則確定性 fallback）。``active_llm`` 在此模組命名空間，測試可 monkeypatch。
     """
     query = (state.get("query") or "").strip()
     if not query:
         raise ValueError("empty query")
-    return {"plan": ["擷取相關段落", "計算指標", "撰寫並標引用"]}
+    return {"plan": planner_agent.make_plan(query, active_llm())}
 
 
 @traced("retriever")
