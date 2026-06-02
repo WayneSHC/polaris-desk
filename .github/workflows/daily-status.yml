@@ -1,0 +1,52 @@
+name: daily-status
+
+on:
+  schedule:
+    - cron: "10 23 * * *"   # 23:10 UTC = 07:10 Asia/Taipei（報告台北昨日）
+  workflow_dispatch: {}      # 可手動觸發測試
+
+permissions:
+  contents: write            # 推 status 分支
+  issues: write              # 更新/建立滾動 Issue
+
+concurrency:
+  group: daily-status
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 產生進度 + 更新滾動 Issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUT_DIR: ${{ runner.temp }}/daily
+        run: |
+          PYTHONPATH=src python -m polaris.daily_status --out-dir "$OUT_DIR" --post-issue
+
+      - name: 發佈到 status 分支
+        env:
+          OUT_DIR: ${{ runner.temp }}/daily
+        run: |
+          set -euo pipefail
+          git config user.name "polaris-status-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin status >/dev/null 2>&1; then
+            git fetch origin status:status   # 直接建本地 status，避開 checkout@v4 受限 refspec
+            git switch status
+          else
+            git switch --orphan status
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+          mkdir -p reports/daily
+          cp "$OUT_DIR"/* reports/daily/
+          git add reports/daily
+          git commit -m "chore(status): daily $(date -u +%F)" || { echo "no changes"; exit 0; }
+          git push origin status
