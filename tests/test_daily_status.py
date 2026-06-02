@@ -191,3 +191,30 @@ def test_merge_rolling_body_prepend_dedup_trim():
         trimmed = RD.merge_rolling_body(trimmed, blk, f"2026-06-{i:02d}", keep_days=14)
     assert trimmed.count("<!--day:") == 14
     assert "reports/daily" in trimmed  # footer 指向 status 分支
+
+
+from polaris.daily_status import publish as PB
+
+
+def test_upsert_creates_issue_when_none_exists():
+    client = FakeClient({"labels=daily-status": []})  # 找不到既有 issue
+    num = PB.upsert_rolling_issue(client, "o/r", "daily-status", "📊 T", "BODY")
+    assert num == 123
+    assert client.posts and client.posts[0][1]["labels"] == ["daily-status"]
+    assert client.posts[0][1]["title"] == "📊 T"
+    assert client.posts[0][1]["body"] == "BODY"
+
+
+def test_upsert_patches_existing_issue():
+    client = FakeClient({"labels=daily-status": [{"number": 88, "body": "old"}]})
+    num = PB.upsert_rolling_issue(client, "o/r", "daily-status", "📊 T", "NEW")
+    assert num == 88
+    assert client.patches and "/issues/88" in client.patches[0][0]
+    assert client.patches[0][1]["body"] == "NEW"
+    assert not client.posts  # 已存在就不新建
+
+
+def test_find_rolling_issue_returns_first():
+    client = FakeClient({"labels=daily-status": [{"number": 5, "body": "b"}]})
+    issue = PB.find_rolling_issue(client, "o/r", "daily-status")
+    assert issue["number"] == 5
