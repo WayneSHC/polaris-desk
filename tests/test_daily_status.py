@@ -131,3 +131,63 @@ def test_aggregate_has_activity_helper():
     assert AG.has_activity(empty) is False
     one = AG.aggregate([Event("commit", "WayneSHC", None, "")], "2026-06-02")
     assert AG.has_activity(one) is True
+
+
+from polaris.daily_status import render as RD
+
+
+def _sample_digest():
+    from polaris.daily_status.aggregate import aggregate
+    from polaris.daily_status.fetch import Event
+
+    return aggregate(
+        [
+            Event("pr_merged", "WayneSHC", 42, "merge X"),
+            Event("commit", "WayneSHC", None, ""),
+            Event("pr_opened", "holajennytw", 44, "wip Y"),
+            Event("commit", "dependabot[bot]", None, ""),
+        ],
+        "2026-06-02",
+    )
+
+
+def test_render_csv_header_and_rows():
+    csv_text = RD.render_csv(_sample_digest())
+    lines = csv_text.strip().splitlines()
+    assert lines[0] == "日期,角色,成員,完成PR,進行中PR,Review數,關閉Issue,commit數,摘要"
+    assert len(lines) == 1 + 7  # header + 7 角色
+    assert lines[1].startswith("2026-06-02,R1,郝家銘,")
+    assert "2026-06-02,R2,施惠棋,1,0,0,0,1," in csv_text
+
+
+def test_render_day_block_has_markers_and_unmapped():
+    block = RD.render_day_block(_sample_digest())
+    assert block.startswith("<!--day:2026-06-02-->")
+    assert block.rstrip().endswith("<!--/day:2026-06-02-->")
+    assert "<details>" in block and "dependabot[bot]×1" in block
+
+
+def test_render_day_block_no_activity_note():
+    from polaris.daily_status.aggregate import aggregate
+
+    block = RD.render_day_block(aggregate([], "2026-06-02"))
+    assert "今日無 GitHub 活動" in block
+
+
+def test_merge_rolling_body_prepend_dedup_trim():
+    d1 = RD.render_day_block_for_test("2026-06-01")  # helper 見下
+    d2 = RD.render_day_block_for_test("2026-06-02")
+    body = RD.merge_rolling_body("", d1, "2026-06-01")
+    body = RD.merge_rolling_body(body, d2, "2026-06-02")
+    # 最新在上
+    assert body.index("day:2026-06-02") < body.index("day:2026-06-01")
+    # 同日重跑 → 不重複
+    body2 = RD.merge_rolling_body(body, d2, "2026-06-02")
+    assert body2.count("<!--day:2026-06-02-->") == 1
+    # 超過 keep_days 會修剪
+    trimmed = body
+    for i in range(3, 20):
+        blk = RD.render_day_block_for_test(f"2026-06-{i:02d}")
+        trimmed = RD.merge_rolling_body(trimmed, blk, f"2026-06-{i:02d}", keep_days=14)
+    assert trimmed.count("<!--day:") == 14
+    assert "reports/daily" in trimmed  # footer 指向 status 分支
