@@ -1,5 +1,5 @@
 # Polaris Desk — 常用指令（make <target>）
-.PHONY: setup install dev db-up db-down test fmt lint check
+.PHONY: setup install dev db-up db-down test fmt lint check check-keys
 
 setup:          ## 一鍵建環境：Python 3.13 venv + 依賴 + .env 範本（人 / AI agent 都跑這個）
 	test -d .venv || uv venv --python 3.13
@@ -24,5 +24,8 @@ fmt:            ## 格式化
 
 lint:           ## 檢查
 	.venv/bin/ruff check src tests
+
+check-keys:     ## 檢查 .env 內哪些 API 金鑰已設定（G1 閘門用）
+	.venv/bin/python -m polaris doctor
 
 check: lint test  ## lint + test 一起跑

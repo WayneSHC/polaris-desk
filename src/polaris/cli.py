@@ -27,11 +27,28 @@ def main(argv: list[str] | None = None) -> int:
         help="(US2) make writer emit buy/sell text to demo compliance blocking",
     )
 
+    sub.add_parser("doctor", help="檢查 .env 內哪些 API 金鑰已正確設定（G1 用）")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "ask":
         return _cmd_ask(args.query, stub_buysell=args.stub_buysell)
+    if args.cmd == "doctor":
+        return _cmd_doctor()
     return 1
+
+
+def _cmd_doctor() -> int:
+    from polaris.diagnostics import key_status
+
+    print("== Polaris Desk — 金鑰健檢 (doctor) ==")
+    statuses = key_status()
+    for name, ok in statuses.items():
+        print(f"  {name:18s} {'✅ set' if ok else '❌ missing'}")
+    if not statuses.get("GEMINI_API_KEY"):
+        print("\nGemini 金鑰未設定：節點走確定性 fallback（無 LLM）。")
+        print("設定方式見 docs/keys-setup.md。")
+    return 0
 
 
 def _cmd_ask(query: str, *, stub_buysell: bool = False) -> int:
