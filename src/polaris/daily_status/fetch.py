@@ -52,6 +52,7 @@ class GitHubClient:
 
 
 def _search(client: Any, query: str) -> list[dict]:
+    # per_page=100, no pagination — plan assumes <100 items/kind/day at 7-person scale
     url = f"{API}/search/issues?q={urllib.parse.quote(query, safe=':+')}&per_page=100"
     data = client.get(url)
     return data.get("items", []) if isinstance(data, dict) else []
@@ -69,18 +70,28 @@ def fetch_events(
     events: list[Event] = []
 
     for it in _search(client, f"repo:{repo}+is:pr+is:merged+merged:{rng}"):
-        events.append(Event("pr_merged", it["user"]["login"], it["number"], it["title"]))
-    for it in _search(client, f"repo:{repo}+is:pr+created:{rng}"):
-        events.append(Event("pr_opened", it["user"]["login"], it["number"], it["title"]))
+        login = (it.get("user") or {}).get("login")
+        if not login:
+            continue
+        events.append(Event("pr_merged", login, it["number"], it["title"]))
+    for it in _search(client, f"repo:{repo}+is:pr+is:open+created:{rng}"):
+        login = (it.get("user") or {}).get("login")
+        if not login:
+            continue
+        events.append(Event("pr_opened", login, it["number"], it["title"]))
     for it in _search(client, f"repo:{repo}+is:issue+is:closed+closed:{rng}"):
-        events.append(Event("issue_closed", it["user"]["login"], it["number"], it["title"]))
+        login = (it.get("user") or {}).get("login")
+        if not login:
+            continue
+        events.append(Event("issue_closed", login, it["number"], it["title"]))
 
-    commits = client.get(f"{API}/repos/{repo}/commits?since={start}&until={end}&per_page=100")
+    commits = client.get(f"{API}/repos/{repo}/commits?since={start}&until={end}&per_page=100")  # per_page=100, no pagination — plan assumes <100 items/kind/day at 7-person scale
     for c in commits if isinstance(commits, list) else []:
         login = (c.get("author") or {}).get("login")
         if login:
             events.append(Event("commit", login, None, ""))
 
+    # N+1: one /reviews GET per PR updated in window (fine at this team's scale)
     for pr in _search(client, f"repo:{repo}+is:pr+updated:{rng}"):
         num = pr["number"]
         reviews = client.get(f"{API}/repos/{repo}/pulls/{num}/reviews?per_page=100")

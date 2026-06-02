@@ -86,7 +86,7 @@ class FakeClient:
 def test_fetch_events_collects_kinds():
     routes = {
         "is:pr+is:merged": {"items": [{"user": {"login": "WayneSHC"}, "number": 42, "title": "merge X"}]},
-        "is:pr+created": {"items": [{"user": {"login": "holajennytw"}, "number": 44, "title": "wip Y"}]},
+        "is:pr+is:open+created": {"items": [{"user": {"login": "holajennytw"}, "number": 44, "title": "wip Y"}]},
         "is:issue+is:closed": {"items": [{"user": {"login": "WayneSHC"}, "number": 7, "title": "close Z"}]},
         "/commits": [{"author": {"login": "WayneSHC"}}, {"author": {"login": "holajennytw"}}],
         "is:pr+updated": {"items": []},  # 無更新 PR → 不抓 reviews
@@ -100,6 +100,34 @@ def test_fetch_events_collects_kinds():
     assert kinds == ["commit", "commit", "issue_closed", "pr_merged", "pr_opened"]
     merged = [e for e in events if e.kind == "pr_merged"][0]
     assert merged.author == "WayneSHC" and merged.number == 42
+
+
+def test_fetch_opened_pr_query_uses_is_open():
+    """opened-PR search query must include is:open so merged PRs are excluded."""
+    client = FakeClient({})
+    start = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
+    end = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
+    F.fetch_events(client, "WayneSHC/polaris-desk", start, end)
+    assert any("is:open" in g for g in client.gets), (
+        "opened-PR search must include is:open in the query URL"
+    )
+
+
+def test_fetch_skips_null_user():
+    """A search result with user=None must be skipped rather than raising TypeError."""
+    routes = {
+        "is:pr+is:merged": {"items": [{"user": None, "number": 99, "title": "ghost PR"}]},
+        "is:pr+is:open+created": {"items": []},
+        "is:issue+is:closed": {"items": []},
+        "/commits": [],
+        "is:pr+updated": {"items": []},
+    }
+    client = FakeClient(routes)
+    start = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
+    end = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
+    events = F.fetch_events(client, "WayneSHC/polaris-desk", start, end)
+    # The null-user item must be silently dropped, not crash
+    assert all(e.kind != "pr_merged" for e in events)
 
 
 # ── Task 4: aggregate ──────────────────────────────────────────────────────────
@@ -246,3 +274,31 @@ def test_cli_writes_files_and_posts_issue(tmp_path, monkeypatch):
     assert (tmp_path / "2026-06-02.md").exists()
     assert (tmp_path / "2026-06-02.csv").exists()
     assert fake.posts  # 有發 issue
+
+
+def test_cli_updates_existing_issue(tmp_path, monkeypatch):
+    """When a rolling issue already exists, main() must PATCH (not POST) it,
+    and the patched body must contain both the old day block and the new one."""
+    old_body = (
+        "<!--day:2026-06-01-->\n"
+        "<details><summary>2026-06-01</summary>x</details>\n"
+        "<!--/day:2026-06-01-->"
+    )
+    existing_issue = [{"number": 88, "body": old_body}]
+    fake = FakeClient({"labels=daily-status": existing_issue})
+    monkeypatch.setattr(M, "GitHubClient", lambda token: fake)
+    # _today_taipei → 2026-06-03, so date_str = 2026-06-02
+    monkeypatch.setattr(M, "_today_taipei", lambda: date(2026, 6, 3))
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+
+    rc = M.main(["--repo", "o/r", "--out-dir", str(tmp_path), "--post-issue"])
+    assert rc == 0
+
+    # Must have PATCHed the existing issue, not created a new one
+    assert fake.patches, "expected patch call for existing issue"
+    assert not fake.posts, "expected no new issue to be created"
+
+    # The patched body must contain both the old 2026-06-01 block and the new 2026-06-02 block
+    patched_body = fake.patches[0][1]["body"]
+    assert "<!--day:2026-06-01-->" in patched_body, "old day block must be preserved"
+    assert "<!--day:2026-06-02-->" in patched_body, "new day block must be present"

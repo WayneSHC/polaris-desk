@@ -46,7 +46,7 @@ jobs:
             git rm -rf . >/dev/null 2>&1 || true
           fi
           mkdir -p reports/daily
-          cp "$OUT_DIR"/* reports/daily/
+          cp "$OUT_DIR"/* reports/daily/ 2>/dev/null || { echo "no output, skipping"; exit 0; }
           git add reports/daily
           git commit -m "chore(status): daily $(date -u +%F)" || { echo "no changes"; exit 0; }
           git push origin status
