@@ -28,7 +28,7 @@
 - [~] D5 G1 驗收（架構面）／GCP·Gemini key 全隊可用 — 工具/文件就緒（`make check-keys`、`docs/keys-setup.md`、`docs/G1_readiness.md`）；**待全員自填金鑰 + 站會過閘**
 
 **W2**
-- [ ] D6 Temporal Anchoring
+- [x] D6 Temporal Anchoring — `graph/temporal.py`：最近N季 / YYYY全年 / YYYYQn / YYYY年第n季 → 季別清單；planner 寫 `state['period']`、retriever 依季別過濾（未入庫季別→誠實回「資料不足」）
 - [ ] D7 LangGraph retry
 - [ ] D8 LLMLingua POC（量 token 省幅）
 - [ ] D9 Compliance Agent 節點接入

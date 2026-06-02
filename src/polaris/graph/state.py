@@ -66,6 +66,29 @@ class NodeTrace(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# PeriodSpec — Temporal Anchoring（W2 D6 / FR-007）
+# ---------------------------------------------------------------------------
+
+PeriodKind = Literal["none", "quarter", "fiscal_year", "recent_quarters"]
+
+
+class PeriodSpec(BaseModel):
+    """從問題解析出的期間意圖 + 解析後的具體季別清單。
+
+    - ``hint``：原始時間語句（如「最近兩季」「2024全年」），無則空字串。
+    - ``kind``：期間種類。
+    - ``quarters``：解析後的季別字串清單（格式 "2024Q3"，對齊 vectorstore），
+      供 retriever 以 ``filters={"period": ...}`` 取對應期間資料；none 時為空。
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    hint: str = Field(default="")
+    kind: PeriodKind = Field(default="none")
+    quarters: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # ResearchState — LangGraph TypedDict
 # ---------------------------------------------------------------------------
 
@@ -85,6 +108,7 @@ class ResearchState(TypedDict, total=False):
 
     # 各節點輸出
     plan: list[str]
+    period: PeriodSpec
     contexts: list[dict[str, Any]]
     calculations: dict[str, Any]
     draft: str
@@ -104,6 +128,8 @@ __all__ = [
     "CitationOrigin",
     "NodeTrace",
     "NodeStatus",
+    "PeriodSpec",
+    "PeriodKind",
     "ResearchState",
     "ComplianceStatus",
 ]

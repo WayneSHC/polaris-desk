@@ -41,6 +41,8 @@ packages = ["src/polaris"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+# 不收集 Google Drive / macOS 同步衝突副本（如 "test_cli 2.py"），避免重複計數
+addopts = ["--ignore-glob=* [0-9].py"]
 
 [tool.ruff]
 line-length = 100

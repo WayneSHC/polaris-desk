@@ -37,6 +37,10 @@ data/
 .idea/
 .vscode/
 
+# Google Drive / macOS 同步衝突副本（如 "foo 2.py"）— 不 commit、不讓 pytest 收集
+* [0-9].py
+* [0-9].md
+
 # Coding agent 本地設定（可能含憑證）— 不 commit
 # 註：.claude/skills/ 的 spec-kit 指令「要」保留共用，故不整個忽略 .claude/
 .claude/settings.local.json

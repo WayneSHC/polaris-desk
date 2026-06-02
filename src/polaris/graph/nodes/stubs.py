@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from polaris.graph import temporal
 from polaris.graph.compliance import apply_compliance
 from polaris.graph.nodes import planner_agent, writer_agent
 from polaris.graph.nodes.trace import traced
@@ -26,6 +27,21 @@ _STUB_CITATION = Citation(
     snippet="（v0 stub）法說頁碼 X：營收 YYY 億元，YoY 約 12.34%。",
     origin="stub",
 )
+
+#: W2 D6 用的迷你假語料：每季一筆，retriever 依 Temporal Anchoring 解析的
+#: 季別過濾。R4 接真實向量檢索後，這個 dict 換成 VectorStore.search(filters=...)，
+#: retriever 的「依 period 取資料」契約不變。
+_STUB_CORPUS: dict[str, dict[str, str]] = {
+    q: {
+        "source_id": f"stub-2330-{q}",
+        "text": f"（v0 stub）台積電 {q} 法說摘要：營收與毛利率資料。",
+        "period": q,
+    }
+    for q in ("2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1")
+}
+
+#: 問題未含期間語句時的預設季別（取最新一季）。
+_DEFAULT_QUARTER = "2025Q1"
 
 #: US2 demo 用：含買賣建議的 stub 草稿，CLI `--stub-buysell` 與測試會用 monkeypatch
 #: 把 :func:`writer` 換成 :func:`writer_with_buysell`，驗證 Compliance 攔截行為。
@@ -50,20 +66,24 @@ def planner(state: dict[str, Any]) -> dict[str, Any]:
     query = (state.get("query") or "").strip()
     if not query:
         raise ValueError("empty query")
-    return {"plan": planner_agent.make_plan(query, active_llm())}
+    return {
+        "plan": planner_agent.make_plan(query, active_llm()),
+        "period": temporal.parse_period(query),  # W2 D6 Temporal Anchoring
+    }
 
 
 @traced("retriever")
 def retriever(state: dict[str, Any]) -> dict[str, Any]:
-    """W1 D1：固定回 1 條 stub context。"""
-    return {
-        "contexts": [
-            {
-                "source_id": _STUB_CITATION.source_id,
-                "text": _STUB_CITATION.snippet,
-            }
-        ]
-    }
+    """W2 D6：依 Temporal Anchoring 解析的季別，只取對應期間的語料。
+
+    - 有解析到季別 → 只回語料中存在的對應季別（未入庫季別 → 0 條，下游誠實
+      回「資料不足」而非編造）。
+    - 無期間語句 → 回預設最新季別 1 條。
+    """
+    period = state.get("period")
+    quarters = list(period.quarters) if period and period.quarters else [_DEFAULT_QUARTER]
+    contexts = [_STUB_CORPUS[q] for q in quarters if q in _STUB_CORPUS]
+    return {"contexts": contexts}
 
 
 @traced("calculator")
