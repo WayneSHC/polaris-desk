@@ -93,3 +93,41 @@ def test_fetch_events_collects_kinds():
     assert kinds == ["commit", "commit", "issue_closed", "pr_merged", "pr_opened"]
     merged = [e for e in events if e.kind == "pr_merged"][0]
     assert merged.author == "WayneSHC" and merged.number == 42
+
+
+from polaris.daily_status import aggregate as AG
+from polaris.daily_status.fetch import Event
+
+
+def test_aggregate_groups_by_role_and_counts():
+    events = [
+        Event("pr_merged", "WayneSHC", 42, "merge X"),
+        Event("commit", "WayneSHC", None, ""),
+        Event("commit", "WayneSHC", None, ""),
+        Event("review", "WayneSHC", 50, "rev"),
+        Event("pr_opened", "holajennytw", 44, "wip Y"),
+        Event("issue_closed", "officehsieh-afk", 7, "close Z"),
+    ]
+    digest = AG.aggregate(events, "2026-06-02")
+
+    assert digest.date_str == "2026-06-02"
+    r2 = digest.per_role["R2"]
+    assert r2.merged_prs == [(42, "merge X")]
+    assert r2.commits == 2
+    assert r2.reviews == 1
+    assert digest.per_role["R4"].opened_prs == [(44, "wip Y")]
+    assert digest.per_role["R3"].closed_issues == [(7, "close Z")]
+    # 所有 7 角色都在（含零活動）
+    assert list(digest.per_role.keys()) == ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
+
+
+def test_aggregate_unmapped_author_collected_not_dropped():
+    digest = AG.aggregate([Event("commit", "dependabot[bot]", None, "")], "2026-06-02")
+    assert digest.unmapped == {"dependabot[bot]": 1}
+
+
+def test_aggregate_has_activity_helper():
+    empty = AG.aggregate([], "2026-06-02")
+    assert AG.has_activity(empty) is False
+    one = AG.aggregate([Event("commit", "WayneSHC", None, "")], "2026-06-02")
+    assert AG.has_activity(one) is True
