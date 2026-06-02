@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from polaris.graph.compliance import apply_compliance
-from polaris.graph.nodes import planner_agent
+from polaris.graph.nodes import planner_agent, writer_agent
 from polaris.graph.nodes.trace import traced
 from polaris.graph.state import Citation
 from polaris.llm.gemini import active_llm
@@ -25,11 +25,6 @@ _STUB_CITATION = Citation(
     source_id="stub-tsmc-2025Q1-001",
     snippet="（v0 stub）法說頁碼 X：營收 YYY 億元，YoY 約 12.34%。",
     origin="stub",
-)
-
-_STUB_DRAFT = (
-    "（v0 假答案）依據引用來源，2025 Q1 營收 YoY 約 12.34%。"
-    "本系統目前以 stub 假資料展示工作流骨架。"
 )
 
 #: US2 demo 用：含買賣建議的 stub 草稿，CLI `--stub-buysell` 與測試會用 monkeypatch
@@ -73,17 +68,25 @@ def retriever(state: dict[str, Any]) -> dict[str, Any]:
 
 @traced("calculator")
 def calculator(state: dict[str, Any]) -> dict[str, Any]:
-    """W1 D1：固定回一組 fake 計算結果。"""
+    """Calculator v0（R2 W1 D3）— 維持確定性假值。
+
+    真實財務指標計算需 R4 的結構化資料（BigQuery / 財報表）尚未進來，
+    故 v0 先回固定值；待 R4 資料就緒後在此節點接真實計算（介面不變）。
+    """
     return {"calculations": {"YoY_pct": 12.34}}
 
 
 @traced("writer")
 def writer(state: dict[str, Any]) -> dict[str, Any]:
-    """W1 D1：合規假草稿 + 1 條 stub citation。"""
-    return {
-        "draft": _STUB_DRAFT,
-        "citations": [_STUB_CITATION],
-    }
+    """Writer Agent v0（R2 W1 D3）。
+
+    依 ``contexts`` 產生帶引用草稿（有金鑰走 Gemini Pro、否則確定性 fallback），
+    citations 由 contexts 接地而來。草稿仍交由下游 Compliance 節點守 NFR-031。
+    """
+    query = state.get("query", "")
+    contexts = state.get("contexts", [])
+    draft, citations = writer_agent.make_draft(query, contexts, active_llm())
+    return {"draft": draft, "citations": citations}
 
 
 @traced("writer")
