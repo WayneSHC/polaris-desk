@@ -4,8 +4,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from polaris.daily_status import __main__ as M
+from polaris.daily_status import aggregate as AG
+from polaris.daily_status import fetch as F
+from polaris.daily_status import publish as PB
+from polaris.daily_status import render as RD
 from polaris.daily_status import roles as R
+from polaris.daily_status import timewindow as TW
+from polaris.daily_status.fetch import Event
 
+
+# ── Task 1: roles ──────────────────────────────────────────────────────────────
 
 def test_role_for_known_username_case_insensitive():
     role = R.role_for("WayneSHC")
@@ -23,8 +32,7 @@ def test_all_roles_ordered_r1_to_r7():
     assert [r.code for r in R.ROLES] == ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
 
 
-from polaris.daily_status import timewindow as TW
-
+# ── Task 2: timewindow ─────────────────────────────────────────────────────────
 
 def test_yesterday_window_normal_day():
     # 台北 2026-06-03 → 報告「台北 2026-06-02 全天」
@@ -45,8 +53,7 @@ def test_to_github_iso_format():
     assert TW.to_github_iso(dt) == "2026-06-02T16:00:00Z"
 
 
-from polaris.daily_status import fetch as F
-
+# ── Task 3: fetch ──────────────────────────────────────────────────────────────
 
 class FakeClient:
     """以 URL 子字串對應 canned JSON；記錄所有請求。網路 0、隨機 0。"""
@@ -95,9 +102,7 @@ def test_fetch_events_collects_kinds():
     assert merged.author == "WayneSHC" and merged.number == 42
 
 
-from polaris.daily_status import aggregate as AG
-from polaris.daily_status.fetch import Event
-
+# ── Task 4: aggregate ──────────────────────────────────────────────────────────
 
 def test_aggregate_groups_by_role_and_counts():
     events = [
@@ -133,8 +138,7 @@ def test_aggregate_has_activity_helper():
     assert AG.has_activity(one) is True
 
 
-from polaris.daily_status import render as RD
-
+# ── Task 5: render ─────────────────────────────────────────────────────────────
 
 def _sample_digest():
     from polaris.daily_status.aggregate import aggregate
@@ -193,8 +197,7 @@ def test_merge_rolling_body_prepend_dedup_trim():
     assert "reports/daily" in trimmed  # footer 指向 status 分支
 
 
-from polaris.daily_status import publish as PB
-
+# ── Task 6: publish ────────────────────────────────────────────────────────────
 
 def test_upsert_creates_issue_when_none_exists():
     client = FakeClient({"labels=daily-status": []})  # 找不到既有 issue
@@ -218,3 +221,28 @@ def test_find_rolling_issue_returns_first():
     client = FakeClient({"labels=daily-status": [{"number": 5, "body": "b"}]})
     issue = PB.find_rolling_issue(client, "o/r", "daily-status")
     assert issue["number"] == 5
+
+
+# ── Task 7: __main__ ───────────────────────────────────────────────────────────
+
+def test_cli_dry_run_prints_block_and_csv(capsys, monkeypatch):
+    # 注入假 client（回 0 活動）與固定「今天」
+    monkeypatch.setattr(M, "GitHubClient", lambda token: FakeClient({}))
+    monkeypatch.setattr(M, "_today_taipei", lambda: date(2026, 6, 3))
+    rc = M.main(["--repo", "o/r", "--dry-run"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "<!--day:2026-06-02-->" in out  # 報告昨日
+    assert "日期,角色,成員" in out
+
+
+def test_cli_writes_files_and_posts_issue(tmp_path, monkeypatch):
+    fake = FakeClient({"labels=daily-status": []})
+    monkeypatch.setattr(M, "GitHubClient", lambda token: fake)
+    monkeypatch.setattr(M, "_today_taipei", lambda: date(2026, 6, 3))
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    rc = M.main(["--repo", "o/r", "--out-dir", str(tmp_path), "--post-issue"])
+    assert rc == 0
+    assert (tmp_path / "2026-06-02.md").exists()
+    assert (tmp_path / "2026-06-02.csv").exists()
+    assert fake.posts  # 有發 issue
