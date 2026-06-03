@@ -83,18 +83,31 @@ class FakeClient:
         return {"number": 123}
 
 
+# 窗：UTC 2026-06-01T16:00:00Z .. 2026-06-02T16:00:00Z（= 台北 2026-06-02 全天）
+_WIN_START = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
+_WIN_END = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
+
+
 def test_fetch_events_collects_kinds():
     routes = {
-        "is:pr+is:merged": {"items": [{"user": {"login": "WayneSHC"}, "number": 42, "title": "merge X"}]},
-        "is:pr+is:open+created": {"items": [{"user": {"login": "holajennytw"}, "number": 44, "title": "wip Y"}]},
-        "is:issue+is:closed": {"items": [{"user": {"login": "WayneSHC"}, "number": 7, "title": "close Z"}]},
+        # /pulls list（最近更新）：一筆窗內 merged、一筆窗內 open
+        "/pulls?state=all": [
+            {"number": 42, "title": "merge X", "user": {"login": "WayneSHC"},
+             "state": "closed", "merged_at": "2026-06-02T03:00:00Z",
+             "created_at": "2026-05-30T00:00:00Z", "updated_at": "2026-06-02T03:00:00Z"},
+            {"number": 44, "title": "wip Y", "user": {"login": "holajennytw"},
+             "state": "open", "merged_at": None,
+             "created_at": "2026-06-02T05:00:00Z", "updated_at": "2026-06-02T05:00:00Z"},
+        ],
+        "/reviews": [],  # 兩筆 PR 都窗內更新 → 會抓 reviews，這裡回空
+        "/issues?state=closed": [
+            {"number": 7, "title": "close Z", "user": {"login": "officehsieh-afk"},
+             "closed_at": "2026-06-02T06:00:00Z"},
+        ],
         "/commits": [{"author": {"login": "WayneSHC"}}, {"author": {"login": "holajennytw"}}],
-        "is:pr+updated": {"items": []},  # 無更新 PR → 不抓 reviews
     }
     client = FakeClient(routes)
-    start = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
-    end = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
-    events = F.fetch_events(client, "WayneSHC/polaris-desk", start, end)
+    events = F.fetch_events(client, "o/r", _WIN_START, _WIN_END)
 
     kinds = sorted(e.kind for e in events)
     assert kinds == ["commit", "commit", "issue_closed", "pr_merged", "pr_opened"]
@@ -102,32 +115,53 @@ def test_fetch_events_collects_kinds():
     assert merged.author == "WayneSHC" and merged.number == 42
 
 
-def test_fetch_opened_pr_query_uses_is_open():
-    """opened-PR search query must include is:open so merged PRs are excluded."""
-    client = FakeClient({})
-    start = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
-    end = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
-    F.fetch_events(client, "WayneSHC/polaris-desk", start, end)
-    assert any("is:open" in g for g in client.gets), (
-        "opened-PR search must include is:open in the query URL"
-    )
+def test_fetch_same_day_open_and_merge_not_double_counted():
+    """一筆當日 open→merge 的 PR（state=closed）只算完成，不算進行中。"""
+    routes = {
+        "/pulls?state=all": [
+            {"number": 50, "title": "fast", "user": {"login": "WayneSHC"},
+             "state": "closed", "merged_at": "2026-06-02T10:00:00Z",
+             "created_at": "2026-06-02T09:00:00Z", "updated_at": "2026-06-02T10:00:00Z"},
+        ],
+        "/reviews": [],
+    }
+    client = FakeClient(routes)
+    kinds = [e.kind for e in F.fetch_events(client, "o/r", _WIN_START, _WIN_END)]
+    assert "pr_merged" in kinds
+    assert "pr_opened" not in kinds  # state=closed → 不算進行中
+
+
+def test_fetch_reviews_within_window_only():
+    """只計入 submitted_at 落在窗內的 review。"""
+    routes = {
+        "/pulls?state=all": [
+            {"number": 70, "title": "rev me", "user": {"login": "WayneSHC"},
+             "state": "open", "merged_at": None,
+             "created_at": "2026-05-01T00:00:00Z", "updated_at": "2026-06-02T08:00:00Z"},
+        ],
+        "/reviews": [
+            {"user": {"login": "officehsieh-afk"}, "submitted_at": "2026-06-02T08:30:00Z"},
+            {"user": {"login": "holajennytw"}, "submitted_at": "2026-05-01T00:00:00Z"},
+        ],
+    }
+    client = FakeClient(routes)
+    reviews = [e for e in F.fetch_events(client, "o/r", _WIN_START, _WIN_END) if e.kind == "review"]
+    assert len(reviews) == 1
+    assert reviews[0].author == "officehsieh-afk" and reviews[0].number == 70
 
 
 def test_fetch_skips_null_user():
-    """A search result with user=None must be skipped rather than raising TypeError."""
+    """user=None（已刪帳號）的項目要跳過、不可 crash。"""
     routes = {
-        "is:pr+is:merged": {"items": [{"user": None, "number": 99, "title": "ghost PR"}]},
-        "is:pr+is:open+created": {"items": []},
-        "is:issue+is:closed": {"items": []},
-        "/commits": [],
-        "is:pr+updated": {"items": []},
+        "/pulls?state=all": [
+            {"number": 99, "title": "ghost", "user": None,
+             "state": "closed", "merged_at": "2026-06-02T10:00:00Z",
+             "created_at": "2026-06-02T09:00:00Z", "updated_at": "2026-06-01T00:00:00Z"},
+        ],
     }
     client = FakeClient(routes)
-    start = datetime(2026, 6, 1, 16, 0, tzinfo=ZoneInfo("UTC"))
-    end = datetime(2026, 6, 2, 16, 0, tzinfo=ZoneInfo("UTC"))
-    events = F.fetch_events(client, "WayneSHC/polaris-desk", start, end)
-    # The null-user item must be silently dropped, not crash
-    assert all(e.kind != "pr_merged" for e in events)
+    events = F.fetch_events(client, "o/r", _WIN_START, _WIN_END)
+    assert events == []  # null-user PR 被靜默跳過，不 crash
 
 
 # ── Task 4: aggregate ──────────────────────────────────────────────────────────

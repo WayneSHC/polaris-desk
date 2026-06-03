@@ -1,8 +1,13 @@
-"""GitHub 活動抓取：GitHubClient（唯一網路類別）+ fetch_events。"""
+"""GitHub 活動抓取：GitHubClient（唯一網路類別）+ fetch_events。
+
+⚠️ 一律用 REST **list** 端點（非 Search API）做時間篩選。原因：GitHub Actions 的
+內建 `GITHUB_TOKEN` 對 `/search/issues` 會回 200 但空結果（即使資料已索引、用 PAT
+查得到），導致每日報告全 0。REST list 端點對 `GITHUB_TOKEN` 正常，故改抓「最近更新的
+前 100 筆」再於程式內用時間窗篩選。
+"""
 from __future__ import annotations
 
 import json
-import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
@@ -51,53 +56,59 @@ class GitHubClient:
         return self._req("PATCH", url, payload)
 
 
-def _search(client: Any, query: str) -> list[dict]:
-    # per_page=100, no pagination — plan assumes <100 items/kind/day at 7-person scale
-    url = f"{API}/search/issues?q={urllib.parse.quote(query, safe=':+')}&per_page=100"
-    data = client.get(url)
-    return data.get("items", []) if isinstance(data, dict) else []
-
-
 def _parse_iso(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+
+
+def _in_window(iso_str: str | None, start_utc: datetime, end_utc: datetime) -> bool:
+    return bool(iso_str) and start_utc <= _parse_iso(iso_str) < end_utc
 
 
 def fetch_events(
     client: Any, repo: str, start_utc: datetime, end_utc: datetime
 ) -> list[Event]:
     start, end = to_github_iso(start_utc), to_github_iso(end_utc)
-    rng = f"{start}..{end}"
     events: list[Event] = []
 
-    for it in _search(client, f"repo:{repo}+is:pr+is:merged+merged:{rng}"):
-        login = (it.get("user") or {}).get("login")
+    # PRs：抓最近更新的前 100 筆（per_page=100，不分頁——plan 假設 <100 PR 動到/日）。
+    prs = client.get(
+        f"{API}/repos/{repo}/pulls?state=all&sort=updated&direction=desc&per_page=100"
+    )
+    for pr in prs if isinstance(prs, list) else []:
+        login = (pr.get("user") or {}).get("login")
         if not login:
             continue
-        events.append(Event("pr_merged", login, it["number"], it["title"]))
-    for it in _search(client, f"repo:{repo}+is:pr+is:open+created:{rng}"):
-        login = (it.get("user") or {}).get("login")
-        if not login:
-            continue
-        events.append(Event("pr_opened", login, it["number"], it["title"]))
-    for it in _search(client, f"repo:{repo}+is:issue+is:closed+closed:{rng}"):
-        login = (it.get("user") or {}).get("login")
-        if not login:
-            continue
-        events.append(Event("issue_closed", login, it["number"], it["title"]))
+        num, title = pr["number"], pr["title"]
+        if _in_window(pr.get("merged_at"), start_utc, end_utc):
+            events.append(Event("pr_merged", login, num, title))
+        # 進行中 = 仍 open 且窗內開啟（state=open 才算，避免同日 open→merge 重複計）
+        if pr.get("state") == "open" and _in_window(pr.get("created_at"), start_utc, end_utc):
+            events.append(Event("pr_opened", login, num, title))
+        # reviews：只對窗內有更新的 PR 抓其 reviews（N+1，team 規模可接受）。
+        if _in_window(pr.get("updated_at"), start_utc, end_utc):
+            reviews = client.get(f"{API}/repos/{repo}/pulls/{num}/reviews?per_page=100")
+            for r in reviews if isinstance(reviews, list) else []:
+                reviewer = (r.get("user") or {}).get("login")
+                if reviewer and _in_window(r.get("submitted_at"), start_utc, end_utc):
+                    events.append(Event("review", reviewer, num, title))
 
-    commits = client.get(f"{API}/repos/{repo}/commits?since={start}&until={end}&per_page=100")  # per_page=100, no pagination — plan assumes <100 items/kind/day at 7-person scale
+    # 關閉的 issue：since 先粗篩（updated_at>=start），再用 closed_at 精篩；排除 PR。
+    issues = client.get(
+        f"{API}/repos/{repo}/issues?state=closed&since={start}"
+        "&sort=updated&direction=desc&per_page=100"
+    )
+    for it in issues if isinstance(issues, list) else []:
+        if "pull_request" in it:  # /issues 會混入 PR，排除
+            continue
+        login = (it.get("user") or {}).get("login")
+        if login and _in_window(it.get("closed_at"), start_utc, end_utc):
+            events.append(Event("issue_closed", login, it["number"], it["title"]))
+
+    # commits（REST，對 GITHUB_TOKEN 一向正常；per_page=100 不分頁）。
+    commits = client.get(f"{API}/repos/{repo}/commits?since={start}&until={end}&per_page=100")
     for c in commits if isinstance(commits, list) else []:
         login = (c.get("author") or {}).get("login")
         if login:
             events.append(Event("commit", login, None, ""))
-
-    # N+1: one /reviews GET per PR updated in window (fine at this team's scale)
-    for pr in _search(client, f"repo:{repo}+is:pr+updated:{rng}"):
-        num = pr["number"]
-        reviews = client.get(f"{API}/repos/{repo}/pulls/{num}/reviews?per_page=100")
-        for r in reviews if isinstance(reviews, list) else []:
-            submitted, login = r.get("submitted_at"), (r.get("user") or {}).get("login")
-            if submitted and login and start_utc <= _parse_iso(submitted) < end_utc:
-                events.append(Event("review", login, num, pr["title"]))
 
     return events
