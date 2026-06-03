@@ -11,8 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from polaris.graph import temporal
-from polaris.graph.compliance import apply_compliance
-from polaris.graph.nodes import planner_agent, writer_agent
+from polaris.graph.nodes import compliance_agent, planner_agent, writer_agent
 from polaris.graph.nodes.trace import traced
 from polaris.graph.state import Citation
 from polaris.llm.gemini import active_llm
@@ -130,13 +129,16 @@ def writer_with_buysell(state: dict[str, Any]) -> dict[str, Any]:
 
 @traced("compliance")
 def compliance(state: dict[str, Any]) -> dict[str, Any]:
-    """US2：呼叫 :func:`polaris.graph.compliance.apply_compliance` 做 6 關鍵字攔截。
+    """W2 D9：Compliance Agent — 6 關鍵字確定性 floor + Gemini smart 層。
+
+    委派 :func:`compliance_agent.review`：floor 命中即攔（LLM 永不解除）；有金鑰時
+    Gemini Flash 補抓隱性建議；LLM 失敗 fail-to-floor。無金鑰（CI）→ floor-only →
+    與 W1 行為一致。
 
     - 合規 → ``answer = draft``、``compliance_status = "passed"``
-    - 命中關鍵字 → ``answer = SAFE_MESSAGE``、``compliance_status = "blocked"``
+    - 命中（關鍵字或 LLM 判定）→ ``answer = SAFE_MESSAGE``、``compliance_status = "blocked"``
     """
-    draft = state.get("draft", "")
-    final, status = apply_compliance(draft)
+    final, status = compliance_agent.review(state.get("draft", ""), active_llm())
     return {
         "answer": final,
         "compliance_status": status,

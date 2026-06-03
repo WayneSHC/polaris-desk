@@ -31,7 +31,7 @@
 - [x] D6 Temporal Anchoring — `graph/temporal.py`：最近N季 / YYYY全年 / YYYYQn / YYYY年第n季 → 季別清單；planner 寫 `state['period']`、retriever 依季別過濾（未入庫季別→誠實回「資料不足」）
 - [x] D7 LangGraph retry — `retry.py` 通用 primitive（`is_transient` 分類 + exponential backoff）；Tier 1 套 LLM 邊界（make_plan/make_draft：暫時性 429/5xx/timeout 重試後恢復才保住 LLM 答案，持續/永久才降級 fallback）；Tier 2 `@traced(retries=)` 節點保險絲（retriever/calculator=2，R4 接真實 I/O 用），用盡仍守 FR-009（error trace + halt）
 - [x] D8 LLMLingua POC（量 token 省幅）— `compression/`：`tokens.py`（tiktoken + regex fallback token 計數）、`compressors.py`（Compressor 介面 + 確定性基線 + LLMLingua 選用 backend，鏡像 `active_llm()` smart-node 模式）、`measure.py`（量測 harness，重用 writer 攤平邏輯）；`python -m polaris.compression` runner 實量確定性基線省 ~7–14%（誠實，不 game 假語料）；≥50% 由本機 `[llmlingua]` extra 跑真 backend 產生、零結構改動。量測 only，**未**接進 live graph（避免未測品質就動 retriever→writer 影響接地）
-- [ ] D9 Compliance Agent 節點接入
+- [x] D9 Compliance Agent 節點接入 — `nodes/compliance_agent.py`：6 關鍵字確定性 floor（`apply_compliance`，永遠先跑、命中即收、LLM 永不解除）+ Gemini Flash smart 層（補抓關鍵字外的隱性建議：進場時機/逢低布局/值得擁有）；**fail-to-floor**（LLM 任何失敗用 D7 retry 撐過後仍失敗則退回 floor，絕不弱化保證）；LLM 只回 verdict、**永不改寫** draft（攔截恆回 SAFE_MESSAGE，SC-003 不破）。`stubs.compliance` 委派 review、輸出契約不變；無金鑰（CI）=floor-only=W1 行為一致。`BUYSELL_KEYWORDS` 仍鎖 6 條（lexicon/紅隊擴充＝R6 W3）。`workflow/state/compliance.py` 不動（node_swap + 5 節點 trace 不變）
 - [ ] D10 G2 驗收（架構面）／協同 R4 跑 **BigQuery 煙測（Q-03）**
 
 **W3（+2 人天）**
