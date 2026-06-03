@@ -35,7 +35,7 @@
 - [~] D10 G2 驗收（架構面）／協同 R4 跑 **BigQuery 煙測（Q-03）** — **架構面已完成**：`docs/G2_readiness.md` 自評（D6–D9 全綠 + 核心不變量，249 passed）；上雲「管路」煙測 harness `diagnostics.bigquery_smoke` + `python -m polaris bq-smoke` / `make bq-smoke`（`test_bq_smoke.py` 背書），把 R4 未實作的 `health_check` 歸 pending、無金鑰歸 skipped，**零接觸 R4 檔、R4 補完即零改碼轉真**。⏳ **完整版待 R4**：真連線 + 入庫資料煙測需 R4 ingestion（SOP §4，尚未開工）；另各成員待設 `GCP_PROJECT`/ADC 金鑰
 
 **W3（+2 人天）**
-- [ ] D11 LangGraph 狀態管理
+- [x] D11 LangGraph 狀態管理 — **AQ-03 拍板（早於 Day 14）＝自寫 ReAct loop（LangGraph subgraph 編排）**，棄 prebuilt `create_react_agent`（已 deprecated + 需 LangChain chat model 新依賴、與 raw google-genai `GeminiClient` smart-node 不一致）。設計 Deep Research 狀態模型：`ReActStep`、`iteration`、`react_steps`（append reducer，可溯源）、`evidence`（依 source_id 去重累積，≥3）、純函式 `should_continue`（硬上限 ≤6 迴圈，直接編碼 FR-004）。不動 `ResearchState`/`workflow.py`（node_swap 不變）。設計文件 `docs/superpowers/specs/2026-06-03-r2-w3-d11-deep-research-aq03-state-design.md`；**ReAct loop + 狀態以 TDD 實作於 D15**
 - [ ] D13 Agent prompt 優化
 - [ ] D15 Deep Research v0：ReAct loop 跑通
 - [ ] D16 Deep Research v1：過驗收（≤6 迴圈 / ≥3 引用 / 可溯源）
