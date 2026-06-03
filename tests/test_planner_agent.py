@@ -83,6 +83,34 @@ class TestMakePlan:
         assert pa.make_plan(q, BoomLLM()) == pa.fallback_plan(q)
 
 
+class TestMakePlanRetry:
+    """D7：LLM 暫時性失敗自動重試；持續失敗 / 永久性錯誤才降級 fallback。"""
+
+    def test_transient_then_recovers_keeps_llm_output(self, no_retry_sleep):
+        from tests.conftest import ApiError, FakeLLM
+
+        client = FakeLLM("1. X\n2. Y\n3. Z", fail_times=2, error=ApiError(503))
+        steps = pa.make_plan("台積電營收", client)
+        assert steps == ["X", "Y", "Z"]  # 撐過抖動，保住 LLM 答案
+        assert len(client.calls) == 3  # 失敗兩次後第三次成功
+
+    def test_persistent_transient_falls_back(self, no_retry_sleep):
+        from tests.conftest import ApiError, FakeLLM
+
+        q = "台積電營收"
+        client = FakeLLM("1. X\n2. Y", fail_times=99, error=ApiError(503))
+        assert pa.make_plan(q, client) == pa.fallback_plan(q)
+        assert len(client.calls) == 3  # 3 次嘗試用盡 → 降級
+
+    def test_permanent_error_not_retried(self):
+        from tests.conftest import ApiError, FakeLLM
+
+        q = "台積電營收"
+        client = FakeLLM("1. X", fail_times=99, error=ApiError(400))
+        assert pa.make_plan(q, client) == pa.fallback_plan(q)
+        assert len(client.calls) == 1  # 永久性錯誤 → 不重試、立即降級
+
+
 class TestPlannerNodeIntegration:
     """節點接進 workflow 後：有金鑰走 LLM、無金鑰走 fallback（皆確定性）。"""
 

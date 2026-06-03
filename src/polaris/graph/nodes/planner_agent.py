@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
+from polaris.retry import call_with_retry
+
 
 class _LLM(Protocol):
     def generate(
@@ -68,11 +70,16 @@ def llm_plan(query: str, client: _LLM) -> list[str]:
 
 
 def make_plan(query: str, client: _LLM | None) -> list[str]:
-    """有 client 走 LLM；失敗 / 空輸出 / 無 client → fallback。"""
+    """有 client 走 LLM；失敗 / 空輸出 / 無 client → fallback。
+
+    D7：LLM 呼叫包進 :func:`polaris.retry.call_with_retry` —— 暫時性錯誤
+    （429 / 5xx / timeout）重試後若恢復就保住 LLM 答案；持續暫時性失敗或
+    永久性錯誤（如 400）則 re-raise，由下面的 ``except`` 優雅降級 fallback。
+    """
     if client is None:
         return fallback_plan(query)
     try:
-        steps = llm_plan(query, client)
+        steps = call_with_retry(lambda: llm_plan(query, client))
     except Exception:  # noqa: BLE001 — LLM 任何失敗都退 fallback，不可讓節點掛掉
         steps = []
     return steps or fallback_plan(query)

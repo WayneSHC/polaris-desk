@@ -20,12 +20,18 @@ import time
 from typing import Any, Callable
 
 from polaris.graph.state import NodeTrace
+from polaris.retry import call_with_retry, is_transient
 
 
 NodeFn = Callable[[dict[str, Any]], dict[str, Any] | None]
 
 
-def traced(node_name: str) -> Callable[[NodeFn], NodeFn]:
+def traced(
+    node_name: str,
+    *,
+    retries: int = 0,
+    retry_on: Callable[[BaseException], bool] = is_transient,
+) -> Callable[[NodeFn], NodeFn]:
     """工廠：回一個包住節點函式的裝飾器。
 
     包裝後的函式契約：
@@ -34,6 +40,16 @@ def traced(node_name: str) -> Callable[[NodeFn], NodeFn]:
     - 回 state patch（dict）；保證含 ``trace`` key（list of 1 個 NodeTrace）。
     - 例外時 patch 額外含 ``halt: True``，且**不**含原節點想 set 的欄位。
     - 不會修改傳入的 state dict。
+
+    D7 節點層保險絲（opt-in）：
+
+    - ``retries>0`` 時，節點呼叫包進 :func:`polaris.retry.call_with_retry`
+      （共 ``retries+1`` 次嘗試），重試發生在下方 try/except **內**——用盡後
+      例外照樣變 error trace + ``halt=True``（FR-009 不變），且整個節點只
+      emit **一筆** trace（不因重試而暴增）。
+    - ``retry_on`` 預設 :func:`is_transient`：永久性錯誤（如 ``ValueError``
+      「empty query」）不重試。
+    - ``retries=0``（預設）→ 與既有行為完全一致（單次嘗試）。
     """
 
     if not node_name or not node_name.strip():
@@ -45,8 +61,15 @@ def traced(node_name: str) -> Callable[[NodeFn], NodeFn]:
             input_keys = sorted(state.keys())
             start = time.perf_counter()
 
+            def _attempt() -> dict[str, Any]:
+                return fn(state) or {}
+
             try:
-                patch = fn(state) or {}
+                patch = (
+                    call_with_retry(_attempt, attempts=retries + 1, retry_on=retry_on)
+                    if retries > 0
+                    else _attempt()
+                )
                 elapsed_ms = max(0, int((time.perf_counter() - start) * 1000))
                 trace = NodeTrace(
                     node_name=node_name,
@@ -69,6 +92,9 @@ def traced(node_name: str) -> Callable[[NodeFn], NodeFn]:
                 )
                 return {"trace": [trace], "halt": True}
 
+        # 重試政策 metadata：方便診斷 / 測試查「哪些節點接了保險絲」。
+        wrapper._traced_node = node_name
+        wrapper._traced_retries = retries
         return wrapper
 
     return decorator

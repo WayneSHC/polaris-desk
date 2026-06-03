@@ -72,13 +72,16 @@ def planner(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@traced("retriever")
+@traced("retriever", retries=2)
 def retriever(state: dict[str, Any]) -> dict[str, Any]:
     """W2 D6：依 Temporal Anchoring 解析的季別，只取對應期間的語料。
 
     - 有解析到季別 → 只回語料中存在的對應季別（未入庫季別 → 0 條，下游誠實
       回「資料不足」而非編造）。
     - 無期間語句 → 回預設最新季別 1 條。
+
+    D7 保險絲（retries=2）：R4 接真實向量檢索後，DB / 網路暫時性失敗自動重試；
+    目前 stub 走記憶體 dict，不會失敗，故對現有行為零影響。
     """
     period = state.get("period")
     quarters = list(period.quarters) if period and period.quarters else [_DEFAULT_QUARTER]
@@ -86,12 +89,15 @@ def retriever(state: dict[str, Any]) -> dict[str, Any]:
     return {"contexts": contexts}
 
 
-@traced("calculator")
+@traced("calculator", retries=2)
 def calculator(state: dict[str, Any]) -> dict[str, Any]:
     """Calculator v0（R2 W1 D3）— 維持確定性假值。
 
     真實財務指標計算需 R4 的結構化資料（BigQuery / 財報表）尚未進來，
     故 v0 先回固定值；待 R4 資料就緒後在此節點接真實計算（介面不變）。
+
+    D7 保險絲（retries=2）：R4 接 BigQuery 後，查詢暫時性失敗自動重試；
+    目前回固定值不會失敗，對現有行為零影響。
     """
     return {"calculations": {"YoY_pct": 12.34}}
 

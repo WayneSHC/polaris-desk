@@ -86,6 +86,35 @@ class TestMakeDraft:
         assert draft == wa.fallback_draft("q", SAMPLE_CONTEXTS)
 
 
+class TestMakeDraftRetry:
+    """D7：Writer 的 Gemini 呼叫暫時性失敗自動重試；持續 / 永久才降級 fallback。"""
+
+    def test_transient_then_recovers_keeps_llm_draft(self, no_retry_sleep):
+        from tests.conftest import ApiError, FakeLLM
+
+        client = FakeLLM("LLM 草稿", fail_times=2, error=ApiError(503))
+        draft, cites = wa.make_draft("q", SAMPLE_CONTEXTS, client)
+        assert draft == "LLM 草稿"  # 撐過抖動，保住 LLM 草稿
+        assert len(client.calls) == 3
+        assert len(cites) == 2  # citations 仍由 contexts 接地
+
+    def test_persistent_transient_falls_back(self, no_retry_sleep):
+        from tests.conftest import ApiError, FakeLLM
+
+        client = FakeLLM("LLM 草稿", fail_times=99, error=ApiError(503))
+        draft, _ = wa.make_draft("q", SAMPLE_CONTEXTS, client)
+        assert draft == wa.fallback_draft("q", SAMPLE_CONTEXTS)
+        assert len(client.calls) == 3  # 3 次嘗試用盡 → 降級
+
+    def test_permanent_error_not_retried(self):
+        from tests.conftest import ApiError, FakeLLM
+
+        client = FakeLLM("LLM 草稿", fail_times=99, error=ApiError(400))
+        draft, _ = wa.make_draft("q", SAMPLE_CONTEXTS, client)
+        assert draft == wa.fallback_draft("q", SAMPLE_CONTEXTS)
+        assert len(client.calls) == 1  # 永久性錯誤 → 不重試
+
+
 class TestWriterNodeIntegration:
     def test_workflow_uses_llm_draft_when_client_available(self, monkeypatch):
         from tests.conftest import FakeLLM

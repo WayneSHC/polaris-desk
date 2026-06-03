@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from polaris.graph.state import Citation
+from polaris.retry import call_with_retry
 
 
 class _LLM(Protocol):
@@ -85,7 +86,9 @@ def make_draft(
     if client is None:
         return fallback_draft(query, contexts), citations
     try:
-        draft = llm_draft(query, contexts, client)
+        # D7：Gemini 呼叫包進 retry —— 暫時性錯誤重試後恢復則保住 LLM 草稿；
+        # 持續暫時性 / 永久性錯誤則 re-raise，由 except 降級 fallback。
+        draft = call_with_retry(lambda: llm_draft(query, contexts, client))
     except Exception:  # noqa: BLE001 — LLM 任何失敗都退 fallback
         draft = ""
     return (draft.strip() or fallback_draft(query, contexts)), citations
