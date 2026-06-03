@@ -30,7 +30,7 @@
 **W2**
 - [x] D6 Temporal Anchoring — `graph/temporal.py`：最近N季 / YYYY全年 / YYYYQn / YYYY年第n季 → 季別清單；planner 寫 `state['period']`、retriever 依季別過濾（未入庫季別→誠實回「資料不足」）
 - [x] D7 LangGraph retry — `retry.py` 通用 primitive（`is_transient` 分類 + exponential backoff）；Tier 1 套 LLM 邊界（make_plan/make_draft：暫時性 429/5xx/timeout 重試後恢復才保住 LLM 答案，持續/永久才降級 fallback）；Tier 2 `@traced(retries=)` 節點保險絲（retriever/calculator=2，R4 接真實 I/O 用），用盡仍守 FR-009（error trace + halt）
-- [ ] D8 LLMLingua POC（量 token 省幅）
+- [x] D8 LLMLingua POC（量 token 省幅）— `compression/`：`tokens.py`（tiktoken + regex fallback token 計數）、`compressors.py`（Compressor 介面 + 確定性基線 + LLMLingua 選用 backend，鏡像 `active_llm()` smart-node 模式）、`measure.py`（量測 harness，重用 writer 攤平邏輯）；`python -m polaris.compression` runner 實量確定性基線省 ~7–14%（誠實，不 game 假語料）；≥50% 由本機 `[llmlingua]` extra 跑真 backend 產生、零結構改動。量測 only，**未**接進 live graph（避免未測品質就動 retriever→writer 影響接地）
 - [ ] D9 Compliance Agent 節點接入
 - [ ] D10 G2 驗收（架構面）／協同 R4 跑 **BigQuery 煙測（Q-03）**
 

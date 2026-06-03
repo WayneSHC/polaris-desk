@@ -78,10 +78,17 @@ saved_pct = (original_tokens − compressed_tokens) / original_tokens × 100
 
 ## 6. 量測結果留底（本機真 LLMLingua 跑完後回填）
 
+`python -m polaris.compression`（確定性基線，tiktoken `cl100k_base`）實量：
+
 | Backend | 語料 | original_tokens | compressed_tokens | saved_pct |
 |---|---|---|---|---|
-| DeterministicCompressor | D6 stub + 代表片段 | _(CI 報告)_ | _(CI 報告)_ | _(實量)_ |
-| LLMLingua（本機） | 同上 | _(待回填)_ | _(待回填)_ | **目標 ≥ 50%** |
+| DeterministicCompressor | D6 stub 語料 | 145 | 125 | 13.79% |
+| DeterministicCompressor | 代表性較長片段 | 181 | 169 | 6.63% |
+| LLMLingua（本機，待裝 `[llmlingua]`） | 同上 | _(待回填)_ | _(待回填)_ | **目標 ≥ 50%** |
+
+**解讀**：確定性基線只靠「去 boilerplate + 壓白 + 去重複行」誠實量到 ~7–14%，遠不及 50%
+——這正說明 ≥50% 必須靠 LLMLingua 的小模型 perplexity 評分（本機 `[llmlingua]` extra 跑），
+而非對假語料硬調指標。harness 與抽象層已就緒，真 backend 到位零結構改動即可量。
 
 ---
 
