@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from polaris.graph.compliance import ComplianceStatus, SAFE_MESSAGE, apply_compliance
+from polaris.graph.prompts import COMPLIANCE_SYSTEM_PROMPT
 from polaris.retry import call_with_retry
 
 
@@ -25,12 +26,7 @@ class _LLM(Protocol):
     ) -> str: ...
 
 
-COMPLIANCE_SYSTEM_PROMPT = (
-    "你是台灣證券法遵審查者。判斷文字是否包含任何投資買賣建議——"
-    "包含顯性（建議買進 / 賣出、加減碼、看多看空）與隱性 / 誘導性語句"
-    "（如「現在很適合進場」「逢低布局」「值得擁有」「可以期待」）。"
-    "只輸出一個詞：VIOLATION（有買賣建議）或 CLEAN（無），不要解釋。"
-)
+# COMPLIANCE_SYSTEM_PROMPT 現由中央 registry（polaris.graph.prompts）提供（D13）。
 
 
 def _build_prompt(draft: str) -> str:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from polaris.graph.prompts import WRITER_SYSTEM_PROMPT as SYSTEM_PROMPT
 from polaris.graph.state import Citation
 from polaris.retry import call_with_retry
 
@@ -19,12 +20,7 @@ class _LLM(Protocol):
     ) -> str: ...
 
 
-SYSTEM_PROMPT = (
-    "你是台灣資本市場投研撰稿助手。只根據提供的引用片段回答，"
-    "每個關鍵數字或主張都要標註對應來源（source_id）。"
-    "嚴禁提供任何買賣建議；只描述事實、標證據、標矛盾。"
-    "找不到依據就明說資料不足，不得臆測。"
-)
+# SYSTEM_PROMPT 現由中央 registry（polaris.graph.prompts）提供，於此重新導出（D13）。
 
 
 def build_citations(contexts: list[dict[str, Any]]) -> list[Citation]:

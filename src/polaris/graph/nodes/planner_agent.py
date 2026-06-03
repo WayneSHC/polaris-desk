@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
+from polaris.graph.prompts import PLANNER_SYSTEM_PROMPT as SYSTEM_PROMPT
 from polaris.retry import call_with_retry
 
 
@@ -21,12 +22,7 @@ class _LLM(Protocol):
     ) -> str: ...
 
 
-SYSTEM_PROMPT = (
-    "你是台灣資本市場投研的規劃助手。把使用者的問題拆解成 2–5 個有序、"
-    "可執行的步驟（擷取資料 → 計算指標 → 彙整並標引用）。"
-    "只輸出步驟本身，每步一行、用數字編號，不要多餘說明。"
-    "不得提供任何買賣建議。"
-)
+# SYSTEM_PROMPT 現由中央 registry（polaris.graph.prompts）提供，於此重新導出（D13）。
 
 # 行首列表標記：`1.` / `2)` / `3、` / `-` / `*` / `•`，後接空白
 _MARKER = re.compile(r"^\s*(?:\d+[.)、]|[-*•])\s+")
