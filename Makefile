@@ -1,5 +1,5 @@
 # Polaris Desk — 常用指令（make <target>）
-.PHONY: setup install dev db-up db-down test fmt lint check check-keys daily-status daily-status-dry
+.PHONY: setup install dev db-up db-down test fmt lint check check-keys bq-smoke daily-status daily-status-dry
 
 setup:          ## 一鍵建環境：Python 3.13 venv + 依賴 + .env 範本（人 / AI agent 都跑這個）
 	test -d .venv || uv venv --python 3.13
@@ -27,6 +27,9 @@ lint:           ## 檢查
 
 check-keys:     ## 檢查 .env 內哪些 API 金鑰已設定（G1 閘門用）
 	.venv/bin/python -m polaris doctor
+
+bq-smoke:       ## BigQuery 雲端管路煙測（G2 用；不需 R4 入庫資料）
+	.venv/bin/python -m polaris bq-smoke
 
 daily-status:   ## 產生昨日各角色進度並更新滾動 Issue（需 GITHUB_TOKEN，本機可用 gh auth token）
 	GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token)} PYTHONPATH=src .venv/bin/python -m polaris.daily_status --post-issue

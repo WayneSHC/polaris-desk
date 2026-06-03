@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     sub.add_parser("doctor", help="檢查 .env 內哪些 API 金鑰已正確設定（G1 用）")
+    sub.add_parser(
+        "bq-smoke", help="BigQuery 雲端管路煙測（G2；不需 R4 入庫資料）"
+    )
 
     args = parser.parse_args(argv)
 
@@ -35,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_ask(args.query, stub_buysell=args.stub_buysell)
     if args.cmd == "doctor":
         return _cmd_doctor()
+    if args.cmd == "bq-smoke":
+        return _cmd_bq_smoke()
     return 1
 
 
@@ -49,6 +54,19 @@ def _cmd_doctor() -> int:
         print("\nGemini 金鑰未設定：節點走確定性 fallback（無 LLM）。")
         print("設定方式見 docs/keys-setup.md。")
     return 0
+
+
+def _cmd_bq_smoke() -> int:
+    from polaris.diagnostics import bigquery_smoke
+
+    print("== Polaris Desk — BigQuery 雲端管路煙測 (bq-smoke) ==")
+    report = bigquery_smoke()
+    icons = {"ok": "✅", "skipped": "⏭️", "pending": "⏳", "fail": "❌"}
+    for st in report.steps:
+        print(f"  {st.name:13s} {icons.get(st.status, '?')} {st.status:8s} {st.detail}")
+    print(f"\n  overall: {report.overall}")
+    # pending / skipped 是 pre-R4 / pre-creds 的預期狀態，非失敗 → 退出碼 0。
+    return 1 if report.overall == "fail" else 0
 
 
 def _cmd_ask(query: str, *, stub_buysell: bool = False) -> int:
