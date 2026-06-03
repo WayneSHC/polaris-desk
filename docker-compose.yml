@@ -1,5 +1,5 @@
 # ===========================================================
-# 本地開發用：一鍵起 Postgres + pgvector（W1–W2 的向量庫）
+# 離線 / Demo fallback：一鍵起 Postgres + pgvector（預設後端是 BigQuery，見 docs/開發環境_BigQuery.md）
 # 用法：make db-up  （或 docker compose up -d db）
 # ===========================================================
 services:

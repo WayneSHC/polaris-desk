@@ -169,8 +169,8 @@
     <p>新聞 / 投研功能只描述、標證據、標矛盾，<b>不得產出任何買賣建議</b>（投顧執照風險）。目標：130 題 + 4 場景 + 紅隊題中買賣建議 = 0。</p></div>
   <div class="law red"><h3><span class="rn">II.</span>引用接地 Grounding<span class="badge">NON-NEGOTIABLE</span></h3>
     <p>每句結論 / 每個數字都要可追溯來源（頁碼 / 出處 / 財報欄位）。無源不輸出；來源矛盾就標出矛盾、不替使用者下結論。</p></div>
-  <div class="law"><h3><span class="rn">III.</span>本地優先 · 金鑰安全</h3>
-    <p>開發先本地 pgvector 省雲費（Q-03）；金鑰只放 <code>.env</code> / Secret Manager，永不 commit、不貼群組、不丟 Drive（Q-10）。</p></div>
+  <div class="law"><h3><span class="rn">III.</span>雲端協作優先 · 金鑰安全</h3>
+    <p>開發預設用 BigQuery 共用 canonical <code>polaris_core</code>（算一次、大家讀），pgvector 留離線 fallback（Q-03，2026-06-02 更新）；金鑰只放 <code>.env</code> / Secret Manager，永不 commit、不貼群組、不丟 Drive（Q-10）。</p></div>
   <div class="law"><h3><span class="rn">IV.</span>Eval 即品質門檻</h3>
     <p>好不好以 Ragas + 三方 Judge 客觀分數為準。CP ≥ 0.85、Faithfulness ≥ 0.90、AR ≥ 0.85；130 題達標 ≥ 80%（G3）。三方 Judge 只在閘門跑、CI 用便宜模型（省 token）。</p></div>
   <div class="law"><h3><span class="rn">V.</span>Demo 可重現 + 離線備援</h3>
@@ -220,8 +220,8 @@
   <h2>4 道 Go / No-Go 閘</h2>
   <p class="sub">到了閘全員停下驗收；沒過就啟動降級，不硬撐。</p>
   <div class="gates">
-    <div class="gate"><div class="d">DAY 5</div><div class="g">G1</div><small>Ontology v1 凍 + 100 份入庫<b>本地 pgvector</b></small></div>
-    <div class="gate"><div class="d">DAY 10</div><div class="g">G2</div><small>e2e + Ragas 上線 + <b>BigQuery 煙測</b>(Q-03)</small></div>
+    <div class="gate"><div class="d">DAY 5</div><div class="g">G1</div><small>Ontology v1 凍 + 100 份入庫 <b>BigQuery polaris_core</b></small></div>
+    <div class="gate"><div class="d">DAY 10</div><div class="g">G2</div><small>e2e + Ragas 上線（<b>BigQuery 為開發後端</b> Q-03）</small></div>
     <div class="gate"><div class="d">DAY 17</div><div class="g">G3</div><small>ColPali/LLMLingua + <b>Eval ≥ 80%</b> + 2 Agent</small></div>
     <div class="gate"><div class="d">DAY 24</div><div class="g">G4</div><small>4 場景<b>雲端</b>可重現 + 離線備援</small></div>
     <div class="gate" style="border-color:var(--gold)"><div class="d">DAY 28</div><div class="g" style="color:var(--gold)">Demo</div><small>5 分鐘無斷點，斷網切預錄</small></div>
@@ -250,8 +250,8 @@
       <div class="dep">🛟 降級：吃緊先保 Deep Research，Watchdog 降 demo-only。</div></div>
 
     <div class="role" data-r="4"><div class="rh"><span class="rn">R4</span><span class="rt">資料工程師</span></div>
-      <p class="mission">Ingestion + 向量庫(pgvector→BigQuery) + ColPali + 新聞第 5 路。</p>
-      <div class="lbl">可驗收</div><ul><li>100 份入本地 pgvector、可被查到；BigQuery 煙測一致(Q-03)</li><li>ColPali 圖表題命中率 ≥ 70% 才採用(TD-01)</li></ul>
+      <p class="mission">Ingestion + 向量庫(BigQuery 主 / pgvector fallback) + ColPali + 新聞第 5 路。</p>
+      <div class="lbl">可驗收</div><ul><li>100 份入 BigQuery <code>polaris_core</code>、可被查到；pgvector fallback 一致(Q-03)</li><li>ColPali 圖表題命中率 ≥ 70% 才採用(TD-01)</li></ul>
       <div class="dep">注意 pgvector 三條雷（見 init_pgvector.sql 註解）。</div></div>
 
     <div class="role" data-r="5"><div class="rh"><span class="rn">R5</span><span class="rt">Eval Lead</span></div>

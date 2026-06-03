@@ -38,11 +38,12 @@ R6 W3 會補完整關鍵字 / regex / 紅隊測試。
 為什麼這條 NON-NEGOTIABLE：我們是**輔助工具**，不是預言家。
 使用者要能驗證、能反駁、能追到底——做不到這點，這套系統就跟「會幻覺的 chatbot」沒兩樣。
 
-### III. 本地優先 · 金鑰安全
+### III. 雲端協作優先 · 金鑰安全
 
-**本地優先**（決策 Q-03）：W1–W3 用 pgvector 在本機跑，W4 才切 BigQuery。
-- 為什麼：學雲端的學費繳一次就好，不必把 4 週都泡在 GCP 上
-- W2 Day 10 先做 BigQuery 煙測（不搬家），確認 768 維 / cosine 兩邊一致再正式切
+**雲端協作優先**（決策 Q-03，2026-06-02 更新）：開發預設後端＝**BigQuery 共用 canonical `polaris_core`**；個人實驗寫進自己的 `polaris_dev_<name>` scratch。
+- 為什麼：100 份法說稿的 embedding **算一次、大家讀**，7 人共用同一份可信資料（省 token、資料一致），勝過 7 份各自的本地 DB
+- **pgvector 不刪**：保留為離線 / Demo fallback（改一個 `VECTOR_BACKEND` env 即切回），維度 768 / cosine 兩端一致
+- 做法見 `docs/開發環境_BigQuery.md` 與 `docs/協作開發環境_SOP_v1.md`
 
 **金鑰絕對只放兩個地方**：本機 `.env` 或 GCP Secret Manager。
 - ❌ 不准 commit、不准貼群組、不准丟 Drive、不准截圖到簡報（決策 Q-10）
@@ -96,8 +97,8 @@ Demo Day 正餐跑**雲端**（Cloud Run + BigQuery + Vercel），但**必須有
 - **編排**：LangGraph（StateGraph）
 - **檢索**：4-way（BM25 + 向量 + ColPali + Cohere Rerank）+ 新聞第 5 路
 - **向量庫**：經 `VectorStore` 介面抽象
-  - `VECTOR_BACKEND=pgvector`（W1–W3 本地）
-  - `VECTOR_BACKEND=bigquery`（W4 上雲）
+  - `VECTOR_BACKEND=bigquery`（**預設**，共用 canonical `polaris_core`）
+  - `VECTOR_BACKEND=pgvector`（離線 / Demo fallback）
   - 維度 768、距離 cosine **兩端一致**，切換後跑同一份 eval 驗證
 - **pgvector 查詢一定要用 `<=>`**（cosine 算子）
   - 用錯算子（`<->` 歐式 / `<#>` 內積）會全表掃描，速度跟 BigQuery 比差千倍
@@ -113,8 +114,8 @@ Demo Day 正餐跑**雲端**（Cloud Run + BigQuery + Vercel），但**必須有
 
 每個閘門過不了就**啟動降級方案，不硬撐**——避免硬撐到 Demo Day 翻車最丟臉。
 
-- **G1 (Day 5)**：Ontology v1 凍結 + 100 份 PDF 入庫本地 pgvector
-- **G2 (Day 10)**：e2e Workflow 跑通 + Ragas 管線上線 + BigQuery 煙測通過（決策 Q-03）
+- **G1 (Day 5)**：Ontology v1 凍結 + 100 份 PDF 入庫 **BigQuery `polaris_core`**
+- **G2 (Day 10)**：e2e Workflow 跑通 + Ragas 管線上線（決策 Q-03 已定：BigQuery 為開發後端，pgvector 留 fallback）
 - **G3 (Day 17)**：ColPali / LLMLingua 整合 + Eval ≥ 80% + Deep Research + Watchdog 可跑
 - **G4 (Day 24)**：4 場景在**雲端**可重現 + 離線備援可切 + Watchdog 上線 + Eval ≥ 80%
 - **Demo Day (Day 28)**：5 分鐘無斷點，斷網切預錄
@@ -132,4 +133,6 @@ Demo Day 正餐跑**雲端**（Cloud Run + BigQuery + Vercel），但**必須有
 
 ---
 
-**Version**: 1.0.1 | **Ratified**: 2026-05-31 | **Last Amended**: 2026-06-01
+**Version**: 1.1.0 | **Ratified**: 2026-05-31 | **Last Amended**: 2026-06-02
+
+> **v1.1.0（2026-06-02）**：原則 III「本地優先」→「雲端協作優先」（決策 Q-03 更新：開發預設後端改為 BigQuery 共用 canonical `polaris_core`，pgvector 保留為 fallback）；§Additional Constraints 向量庫預設、G1/G2 同步調整。**待 PM (R1) + Tech Lead (R2) 雙簽確認**（見 Governance；若認定為原則重定義，版號改 2.0.0）。

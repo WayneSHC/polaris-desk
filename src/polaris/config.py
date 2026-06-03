@@ -1,7 +1,7 @@
 """唯一設定來源 —— 全部從 .env 讀進來。
 
-本地與雲端用同一份程式，差別只在 .env（或雲端環境變數）。
-這就是「本地先開發、再上雲」不用改程式的關鍵之一。
+雲端與本地用同一份程式，差別只在 .env（或雲端環境變數）。
+預設後端為 BigQuery（共用 canonical）；pgvector 為離線 fallback——換後端只改 VECTOR_BACKEND。
 """
 from __future__ import annotations
 
@@ -13,15 +13,16 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # --- 向量庫後端開關（本地 ↔ 雲端就靠這個）---
-    vector_backend: str = "pgvector"          # pgvector | bigquery
+    # --- 向量庫後端開關（雲端 ↔ 本地就靠這個）---
+    vector_backend: str = "bigquery"          # bigquery（預設）| pgvector（離線 fallback）
 
-    # 本地 pgvector
+    # 雲端 BigQuery（預設後端）
+    gcp_project: str = "polaris-desk-team"
+    bq_dataset: str = "polaris_core"          # 共用唯讀 canonical
+    dev_dataset: str = ""                     # 個人 scratch（polaris_dev_<name>）；寫入走這裡
+
+    # 本地 pgvector（離線 fallback）
     database_url: str = "postgresql://polaris:polaris@localhost:5432/polaris"
-
-    # 雲端 BigQuery
-    gcp_project: str = ""
-    bq_dataset: str = "polaris"
 
     # LLM / 檢索金鑰（可留空，跑骨架測試不需要）
     gemini_api_key: str = ""

@@ -20,7 +20,7 @@
 | `R1_PM_spec.md` | 產品願景 / Demo 劇本 / 進度治理 |
 | `R2_架構師_spec.md` | LangGraph 編排 / Deep Research Agent / 上雲 |
 | `R3_Agent_spec.md` | 4-way 檢索 / Writer 引用 / Watchdog Agent |
-| `R4_資料_spec.md` | Ingestion / pgvector→BigQuery / ColPali / 新聞 |
+| `R4_資料_spec.md` | Ingestion / BigQuery（pgvector fallback）/ ColPali / 新聞 |
 | `R5_Eval_spec.md` | Ragas / 三方 Judge / 130 題 ≥80% |
 | `R6_金融品質_spec.md` | 台股 Ontology / 金融事實校對 / NFR-031 紅隊 |
 | `R7_Demo全端_spec.md` | 前端 / 引用 UI / ReAct trace / 上雲部署 |

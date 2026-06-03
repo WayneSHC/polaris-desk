@@ -10,4 +10,5 @@
 - 🔴 **NFR-031**：不得產出任何買賣建議。
 - 🔑 **金鑰**只放 `.env` / Secret Manager，永不 commit。
 - **技術棧**：`google-genai` 新 SDK + `gemini-3-*-preview` + `gemini-embedding-2`（768/cosine）。
+- **向量庫**：預設 `VECTOR_BACKEND=bigquery`（共用 `polaris_core`）；pgvector 為離線 fallback，**別改回預設**。寫入只進自己的 `polaris_dev_<name>`。詳見 `docs/開發環境_BigQuery.md`。
 - **不直接推 `main`**：開分支 → PR → 1 人 review → 合。

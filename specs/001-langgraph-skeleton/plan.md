@@ -30,7 +30,7 @@
 **Constraints**:
 - Deterministic — 同問題重跑 3 次結果完全相同（SC-006）
 - 工作流結構與節點實作分離 — 換節點不改 workflow 定義檔（FR-007 / SC-005）
-- 不得有任何 LLM / DB 呼叫（Constitution III 本地優先 + W1 D1 cost = $0）
+- 不得有任何 LLM / DB 呼叫（Constitution III + W1 D1 cost = $0）
 
 **Scale/Scope**: 1 範例問題 × 3 重跑驗證；Compliance 攔截 6 關鍵字 × 雙向（含/不含）測試案例
 
@@ -42,7 +42,7 @@
 |---|---|---|
 | **I. NFR-031（買賣建議攔截）** | Compliance 節點以關鍵字清單攔截 Writer 草稿，最終輸出 0 買賣建議 | spec FR-005、SC-003；本 plan §Phase 1 `compliance.py` |
 | **II. 引用接地** | `answer` 每次回傳必含 `citations` 欄位（W1 stub citation 含 source_id + snippet），為後續 grounding metric 留位 | spec FR-004、Key Entities `Citation` |
-| **III. 本地優先 · 金鑰安全** | W1 D1 stub 模式 0 LLM / 0 DB → 0 金鑰需求；測試在本機 pytest 跑完 | 不 import `google-genai`、`psycopg` |
+| **III. 雲端協作優先 · 金鑰安全** | W1 D1 stub 模式 0 LLM / 0 DB → 0 金鑰需求；測試在本機 pytest 跑完 | 不 import `google-genai`、`psycopg` |
 | **IV. Eval 即品質門檻** | SC-006 確定性 → R5 可寫 snapshot 測試，CI 跑 1 個確定性 fixture 不花 token | quickstart.md 跑法 |
 | **V. Demo 可重現 + 離線備援** | Stub mode 本身就是「斷網可跑」的離線備援雛形 | 整個 feature 不需網路 |
 | **VI. 最新技術棧** | 用 LangGraph `StateGraph`（pyproject 0.6+）；無 LLM 呼叫 → 不會誤用舊版 Gemini SDK | pyproject 已釘版本 |
@@ -151,7 +151,7 @@ Research.md 產出，解決下列 4 個技術選擇：
 |---|---|
 | I. NFR-031 | ✅ `compliance.py` 純函式 6 關鍵字攔截，contracts 文件已寫明攔截後輸出 |
 | II. 引用接地 | ✅ `Citation` 模型 + `citations` 欄位納入 state 與輸出契約 |
-| III. 本地優先 · 金鑰安全 | ✅ 設計檔案無任何 `google-genai` / `psycopg` import |
+| III. 雲端協作優先 · 金鑰安全 | ✅ 設計檔案無任何 `google-genai` / `psycopg` import |
 | IV. Eval 即品質門檻 | ✅ 確定性 stub + 3 次重跑相同的測試已列入 tasks 預備 |
 | V. Demo 可重現 + 離線備援 | ✅ 整顆 feature 0 網路、0 LLM |
 | VI. 最新技術棧 | ✅ 只 import langgraph + pydantic + stdlib |
