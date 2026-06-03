@@ -37,7 +37,7 @@
 **W3（+2 人天）**
 - [x] D11 LangGraph 狀態管理 — **AQ-03 拍板（早於 Day 14）＝自寫 ReAct loop（LangGraph subgraph 編排）**，棄 prebuilt `create_react_agent`（已 deprecated + 需 LangChain chat model 新依賴、與 raw google-genai `GeminiClient` smart-node 不一致）。設計 Deep Research 狀態模型：`ReActStep`、`iteration`、`react_steps`（append reducer，可溯源）、`evidence`（依 source_id 去重累積，≥3）、純函式 `should_continue`（硬上限 ≤6 迴圈，直接編碼 FR-004）。不動 `ResearchState`/`workflow.py`（node_swap 不變）。設計文件 `docs/superpowers/specs/2026-06-03-r2-w3-d11-deep-research-aq03-state-design.md`；**ReAct loop + 狀態以 TDD 實作於 D15**
 - [x] D13 Agent prompt 優化 — ① 中央 prompt registry `graph/prompts.py`：共用片段 `NO_ADVICE_CLAUSE`（NFR-031 single source）/`GROUNDING_CLAUSE`，組裝 PLANNER/WRITER/COMPLIANCE/REACT system prompt；planner/writer/compliance 改 import + 重新導出（零行為變更，測試全過）。② Deep Research ReAct 機制 `graph/deep_research/react.py`：`REACT_SYSTEM_PROMPT`、`ReActTool`/`DEFAULT_TOOLS`(search/finish)/`render_tools`、`build_react_prompt`（工具+scratchpad+問題）、`parse_react_action`（解析 Action/Action Input，格式錯誤安全退 finish）。測試含「生成型 prompt 皆含 NO_ADVICE_CLAUSE」不變量。workflow/state 不動；loop 本體 D15 實作
-- [ ] D15 Deep Research v0：ReAct loop 跑通
+- [x] D15 Deep Research v0：ReAct loop 跑通 — `graph/deep_research/`：`state.py`（`ReActStep`、`dedup_evidence` 依 source_id 去重累積、`should_continue` 硬上限 ≤6、`DeepResearchResult`）、`agent.py`（`run_deep_research` 純 Python bounded loop：reason→act→observe；smart 走 Gemini+D7 retry / 無金鑰走確定性 facet 政策；LLM 失敗 fail-to-deterministic；`stub_search` token-free seam，R4 真實檢索之後接這）。最終結論一律過 **D9 Compliance**（NFR-031）；`_synthesize` 不產買賣建議。消費 D13 `react.py`。不動 workflow/state(5節點)/compliance。23 新測（state 11+agent 12，含 NFR-031 攔截、bounded、LLM 退確定性）。嚴格驗收（≤6/≥3/可溯源/0 建議）＝D16
 - [ ] D16 Deep Research v1：過驗收（≤6 迴圈 / ≥3 引用 / 可溯源）
 - [ ] D17 G3 評審
 
