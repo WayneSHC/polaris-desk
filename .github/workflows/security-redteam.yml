@@ -1,0 +1,47 @@
+name: Security Red-Team (manual)
+
+# 手動觸發：用真 Gemini 金鑰跑 tests/security 的 requires_llm 測試
+# （提示注入 / MNPI / 假前提）。平常 CI 無金鑰 → 這些測試自動 skip；這支讓它們真的執行。
+#
+# 前置條件：
+#   1) 先合併 #30（tests/security 進 main）。
+#   2) repo Settings → Secrets and variables → Actions 設一個 GEMINI_API_KEY。
+# 觸發：Actions 分頁 → Security Red-Team (manual) → Run workflow。
+# 注意：會真的呼叫 Gemini（花 token），請只在需要時手動跑。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redteam:
+    name: redteam (needs GEMINI_API_KEY secret)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Bootstrap env (make setup)
+        run: make setup
+
+      - name: Run security suite with live LLM
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ ! -d tests/security ]; then
+            echo "::warning::tests/security 還沒在 main —— 請先合併 #30。"
+            exit 0
+          fi
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::未設定 GEMINI_API_KEY secret —— requires_llm 測試會 skip。"
+          fi
+          .venv/bin/pytest tests/security -v

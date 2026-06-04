@@ -1,0 +1,51 @@
+name: Security
+
+# 供應鏈 + 機密掃描。**獨立於必需的 `test` 檢查** —— 預設不是 required status check，
+# 即使這裡示警也不會卡住 PR 合併（pip-audit 報依賴已知漏洞 = LLM03；gitleaks 擋金鑰進 git
+# = LLM02 + 憲法「金鑰永不進 git」）。要收緊：Settings → Branches 把 dep-audit / secret-scan
+# 設為 required。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dep-audit:
+    name: dep-audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        # 與 ci.yml 一致：setup-uv 已停發大版本標籤，固定完整版本號
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Bootstrap env (make setup)
+        run: make setup
+
+      - name: pip-audit (依賴已知漏洞)
+        run: |
+          uv pip install pip-audit
+          .venv/bin/pip-audit --progress-spinner off
+
+  secret-scan:
+    name: secret-scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 掃整個 git 歷史，不只最新 commit
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
