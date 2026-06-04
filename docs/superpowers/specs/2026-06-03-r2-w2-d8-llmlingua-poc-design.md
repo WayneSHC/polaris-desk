@@ -76,19 +76,37 @@ saved_pct = (original_tokens − compressed_tokens) / original_tokens × 100
 
 ---
 
-## 6. 量測結果留底（本機真 LLMLingua 跑完後回填）
+## 6. 量測結果留底（本機真 LLMLingua-2 已跑完，2026-06-04 回填）
 
-`python -m polaris.compression`（確定性基線，tiktoken `cl100k_base`）實量：
+**環境**：`~/code/polaris-desk`、`[llmlingua]` extra（llmlingua 0.2.2 / torch 2.12 / transformers 5.10），
+LLMLingua-2 模型 `microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank`（多語含中文、`device_map=cpu`）。
+token 計數＝tiktoken `cl100k_base`（本環境已裝；**同一 counter 同時量原文與壓縮文**，故 rate 與絕對 tokenizer 不影響「相對省幅」結論）。
 
-| Backend | 語料 | original_tokens | compressed_tokens | saved_pct |
-|---|---|---|---|---|
-| DeterministicCompressor | D6 stub 語料 | 145 | 125 | 13.79% |
-| DeterministicCompressor | 代表性較長片段 | 181 | 169 | 6.63% |
-| LLMLingua（本機，待裝 `[llmlingua]`） | 同上 | _(待回填)_ | _(待回填)_ | **目標 ≥ 50%** |
+**確定性基線**（`python -m polaris.compression`，常駐 token-free）：
 
-**解讀**：確定性基線只靠「去 boilerplate + 壓白 + 去重複行」誠實量到 ~7–14%，遠不及 50%
-——這正說明 ≥50% 必須靠 LLMLingua 的小模型 perplexity 評分（本機 `[llmlingua]` extra 跑），
-而非對假語料硬調指標。harness 與抽象層已就緒，真 backend 到位零結構改動即可量。
+| 語料 | original | compressed | saved_pct |
+|---|---|---|---|
+| D6 stub 語料 | 240 | 220 | 8.33% |
+| 代表性較長片段 | 276 | 256 | 7.25% |
+
+**LLMLingua-2 真 backend**（`POLARIS_USE_LLMLINGUA=1 [POLARIS_LLMLINGUA_RATE=…] python -m polaris.compression`），rate 掃描：
+
+| 語料 | rate=0.5（預設）| rate=0.4 | **rate=0.33** | rate=0.25 | rate=0.2 |
+|---|---|---|---|---|---|
+| D6 stub 語料 | 32.08% | 45.42% | **55.83%** | 68.33% | 75.0% |
+| 代表性較長片段 | 34.42% | 46.74% | **55.43%** | 64.49% | 73.19% |
+
+**✅ SC-006 達成**：LLMLingua-2 在 **rate≈0.33**（保留 ~1/3 詞）對兩個語料皆 **省 ≥ 50%**
+（55.83% / 55.43%，以**獨立的 tiktoken cl100k** 量測，非採 llmlingua 自報 ratio）。
+可重現：`POLARIS_USE_LLMLINGUA=1 POLARIS_LLMLINGUA_RATE=0.33 python -m polaris.compression`。
+
+**解讀與取捨**：
+- 預設保守 rate=0.5 在中文短財經片段、以 tiktoken 量只 ~33%——因 LLMLingua 的 rate 是「保留**詞**比例」，
+  被丟的多是低資訊虛詞 / 重複，保留的數字 / 專名在 tiktoken 下每詞 token 較多，故 tiktoken 省幅 < rate。
+- 達 ≥50% 需更積極（rate≈0.33）；但**更積極壓縮＝更可能傷及引用接地**（數字 / `[source_id]` 標記）——
+  這正是 §4「**量測 only、未接 live graph**」的理由：live 整合須先量壓縮對答案品質 / FR-004 接地的影響、另行設閘。
+- 確定性基線只靠去 boilerplate / 壓白 / 去重複行，誠實 ~7–8%，遠不及 50%——≥50% 必須靠 LLMLingua 小模型的 perplexity 評分。
+- 註：舊版 §6 基線（145/181）係 tiktoken 未安裝時的 regex 估計值；本次統一改用 tiktoken cl100k，全表同一 counter。
 
 ---
 

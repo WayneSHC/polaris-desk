@@ -17,7 +17,7 @@
 | G3 條件 | owner | R2 視角狀態 | 證據 / 備註 |
 |---|---|---|---|
 | **Deep Research 可跑** | **R2** | ✅ | v0 loop 跑通（D15）+ v1 過驗收（D16）；見 §C 場景 2 四門檻 |
-| **LLMLingua** 整合 | **R2**（量測）/ 全隊（整合決策）| ◐ | 量測 harness ✅、確定性基線實量 ~7–14%；**≥50% 實測待本機 `[llmlingua]` extra**（§E action item）。**刻意「量測 only、未接進 live graph」**（D8：避免未測品質就動 retriever→writer 影響接地）|
+| **LLMLingua** 整合 | **R2**（量測）/ 全隊（整合決策）| ✅（量測）| 量測 harness ✅；**真 LLMLingua-2 已實測達 SC-006 ≥50%**（rate≈0.33：D6 stub 55.83% / 代表性片段 55.43%，獨立 tiktoken 量；2026-06-04，見 D8 設計 §6）；確定性基線 ~7–8%。**刻意「量測 only、未接進 live graph」**（D8：更積極壓縮會傷引用接地，live 整合須另行設閘）|
 | ColPali 整合 | R6 | ⤷ 跨角色 | POC 待 R6；**若失敗 → 砍場景 3 + ColPali**（spec 已定）。不影響 R2 Deep Research |
 | Eval ≥ 80% | R5 | ⤷ 跨角色 | 130 題 Ragas + 三方 Judge（CP≥0.85 / Faithfulness≥0.90 / AR≥0.85）；R5 spec D17 公布分數 |
 | Watchdog 可跑 | R3 | ⤷ 跨角色 | 事件 Watchdog Agent 待 R3 |
@@ -60,7 +60,7 @@
 
 | 項目 | 由誰 | 影響 |
 |---|---|---|
-| LLMLingua ≥50% 實測 | R2（本機）| `uv pip install -e '.[llmlingua]'`（torch，刻意不進 CI）+ 跑 `python -m polaris.compression`，回填 D8 設計文件 §6。**G3 LLMLingua 半邊收尾** |
+| ~~LLMLingua ≥50% 實測~~ ✅ **已完成（2026-06-04）** | R2 | 真 LLMLingua-2（`bert-base-multilingual`, CPU）rate≈0.33 實測 **55.83% / 55.43%** ≥50%；D8 §6 已回填；可重現 `POLARIS_USE_LLMLINGUA=1 POLARIS_LLMLINGUA_RATE=0.33 python -m polaris.compression`。CI 仍 token-free（`[llmlingua]` 不進 CI）|
 | Eval ≥ 80%（130 題 Ragas + 三方 Judge）| R5 | **G3 硬門檻**；R5 spec D17 公布分數。卡關 < 80% 啟動降級（砍場景 3）|
 | ColPali POC | R6 | G3 條件；**失敗 → 砍場景 3 + ColPali**（spec 已定 contingency）。不阻擋 R2 Deep Research |
 | Watchdog Agent 可跑 | R3 | G3 條件（第 2 個 Agent）|
@@ -74,8 +74,9 @@
 （場景 2 四門檻全過且可重現，`test_deep_research_acceptance.py` 背書），W3 交付 D11/D13/D15/D16 全綠、
 5 節點 e2e / 節點可換 / 確定性 / 合規攔截等核心不變量持續綠（**304 passed, ruff clean**）。
 
-**R2 半邊未收尾（非阻塞、非架構碼問題）**：LLMLingua **≥50% 實測**待本機 `[llmlingua]` extra 跑真 backend
-（量測 harness 已就緒、基線已實量；且 D8 刻意「量測 only、未接進 live graph」）。
+**R2 半邊已收尾（2026-06-04）**：LLMLingua **≥50% 實測完成**——真 LLMLingua-2 backend（本機 `[llmlingua]` extra）
+rate≈0.33 對兩語料量到 **55.83% / 55.43%**（SC-006 達標，D8 §6 已回填，獨立 tiktoken 量、可重現）。CI 維持 token-free。
+更積極壓縮會傷引用接地，故仍守 D8「量測 only、未接進 live graph」，live 整合另行設閘。
 
 **整體 G3 是否過閘取決於跨角色硬門檻**：Eval ≥ 80%（R5）、ColPali（R6，失敗則砍場景 3）、Watchdog（R3）。
 建議 **R1 彙整 4 條件逐項 owner 簽核**（R1 spec D15–16）作為 G3 最終裁定；R2 在此確認**架構面與 Deep Research 端**已備妥。

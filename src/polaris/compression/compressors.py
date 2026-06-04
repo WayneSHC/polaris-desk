@@ -70,15 +70,33 @@ class _LLMLinguaCompressor:
         return str(result)
 
 
-def make_llmlingua_compressor(rate: float = 0.5) -> _LLMLinguaCompressor:
-    """建立真實 LLMLingua backend；未安裝 → RuntimeError。"""
+#: LLMLingua-2 多語小模型（含中文）。BERT-base multilingual，~700MB，公開無需 HF 登入。
+#: 刻意**不**用 llmlingua 預設的 `NousResearch/Llama-2-7b-hf`（gated 7B、~13GB、不適中文 / CPU）。
+_DEFAULT_LLMLINGUA2_MODEL = "microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank"
+
+
+def make_llmlingua_compressor(
+    rate: float | None = None, *, model_name: str | None = None
+) -> _LLMLinguaCompressor:
+    """建立真實 LLMLingua-2 backend（多語小模型、CPU）；未安裝 → RuntimeError。
+
+    - 模型可用 ``POLARIS_LLMLINGUA_MODEL`` 覆寫（預設 :data:`_DEFAULT_LLMLINGUA2_MODEL`）。
+    - 壓縮 rate（保留比例）：未明指時讀 ``POLARIS_LLMLINGUA_RATE``、預設 0.5（保守）；
+      量 ≥50% 省幅目標時調更積極（≈0.33，見 D8 設計 §6）。
+    """
     try:
         from llmlingua import PromptCompressor  # type: ignore
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(
             "llmlingua 未安裝；請 `uv pip install -e '.[llmlingua]'` 後於本機執行 POC。"
         ) from exc
-    return _LLMLinguaCompressor(PromptCompressor(), rate=rate)  # pragma: no cover
+    if rate is None:
+        rate = float(os.getenv("POLARIS_LLMLINGUA_RATE", "0.5"))
+    model = model_name or os.getenv("POLARIS_LLMLINGUA_MODEL", _DEFAULT_LLMLINGUA2_MODEL)
+    compressor = PromptCompressor(  # pragma: no cover - 需本機重依賴
+        model_name=model, use_llmlingua2=True, device_map="cpu"
+    )
+    return _LLMLinguaCompressor(compressor, rate=rate)  # pragma: no cover
 
 
 def _llmlingua_enabled() -> bool:

@@ -1,8 +1,10 @@
 """POC runner：``python -m polaris.compression``（D8）。
 
 對代表性語料跑壓縮量測並印報告。預設走確定性壓縮器（token-free）；
-本機要量 LLMLingua ≥50% 目標時設 ``POLARIS_USE_LLMLINGUA=1`` 並裝
-``polaris-desk[llmlingua]`` 後重跑，數字回填設計文件 §6。
+本機要量 LLMLingua ≥50% 目標時裝 ``polaris-desk[llmlingua]`` 後設
+``POLARIS_USE_LLMLINGUA=1`` 重跑。rate 預設 0.5（保守、~33%）；達 ≥50% 設
+``POLARIS_LLMLINGUA_RATE=0.33``（見設計文件 §6，已實測 55.83% / 55.43%）。
+模型可用 ``POLARIS_LLMLINGUA_MODEL`` 覆寫（預設 LLMLingua-2 多語小模型）。
 """
 from __future__ import annotations
 
