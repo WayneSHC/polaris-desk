@@ -1,0 +1,39 @@
+# Polaris Desk — 容器 build context 排除清單
+# 重點：.env / 金鑰絕不進映像（執行期由 Cloud Run + Secret Manager 注入）
+
+# 祕密 / 環境（執行期注入，絕不烘進映像）
+.env
+.env.*
+*_access.json
+core_access.json
+
+# 版本控制 / 開發環境
+.git
+.gitignore
+.venv
+venv
+
+# Python 快取 / 建置產物
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+build
+dist
+
+# 不需進映像（健康骨架不跑測試 / 不讀文件）
+tests
+docs
+specs
+scripts
+.github
+.specify
+.claude
+
+# 編輯器 / OS
+.DS_Store
+.idea
+.vscode
