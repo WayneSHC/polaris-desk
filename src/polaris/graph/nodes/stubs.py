@@ -13,6 +13,7 @@ from typing import Any
 from polaris.graph import temporal
 from polaris.graph.nodes import compliance_agent, planner_agent, writer_agent
 from polaris.graph.nodes.trace import traced
+from polaris.graph.redaction import redact
 from polaris.graph.state import Citation
 from polaris.llm.gemini import active_llm
 
@@ -137,8 +138,12 @@ def compliance(state: dict[str, Any]) -> dict[str, Any]:
 
     - 合規 → ``answer = draft``、``compliance_status = "passed"``
     - 命中（關鍵字或 LLM 判定）→ ``answer = SAFE_MESSAGE``、``compliance_status = "blocked"``
+
+    最後一律過 :func:`polaris.graph.redaction.redact` 做輸出端機密 / PII 遮罩
+    （defense-in-depth；SAFE_MESSAGE 無機密，遮罩為 no-op）。
     """
     final, status = compliance_agent.review(state.get("draft", ""), active_llm())
+    final, _ = redact(final)
     return {
         "answer": final,
         "compliance_status": status,
