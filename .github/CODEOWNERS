@@ -1,0 +1,10 @@
+# Polaris Desk — Code Owners
+#
+# 新手團隊的品質關卡：所有變更要合進受保護的 main 之前，
+# 都需要 code owner（R2 Tech Lead）審核批准。
+# 隊友可以自由開分支、開 PR、互相 review，但「最後放行」一定要 R2 過。
+#
+# 搭配分支保護的「Require review from Code Owners」生效。
+# 想加備援審核人時，把 GitHub 帳號加在同一行（任一位批准即可）。
+
+*       @WayneSHC

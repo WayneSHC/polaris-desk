@@ -1,0 +1,34 @@
+name: CI
+
+# 新手團隊安全網：任何 PR 都要先跑過測試才能合進 main。
+# 設為 required status check 後，測試沒綠燈 merge 鈕會點不下去。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        # setup-uv 已停發 @v8 等大版本標籤（供應鏈安全），固定完整版本號
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Bootstrap env (make setup)
+        run: make setup
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test

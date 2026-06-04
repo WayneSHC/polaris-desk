@@ -38,10 +38,10 @@ make setup     # 建 Python 3.13 venv + 裝依賴 + 產生 .env 範本（idempot
 
 ## 協作流程
 
-- **不直接推 `main`**：開分支 → PR → 1 人 review → 合（`main` 已設分支保護）。
+- **不直接推 `main`**：開分支 → push → 開 PR。**不要自己按 Merge** —— 由 code owner（**R2**）審核批准、且 **CI 測試綠燈**後才放行（`main` 已設分支保護 + CODEOWNERS + 必過 CI）。
   ```bash
   git switch -c r3/retriever-v0
-  git push -u origin r3/retriever-v0   # 再到 GitHub 開 PR
+  git push -u origin r3/retriever-v0   # 再到 GitHub 開 PR，等 R2 review + CI 過
   ```
 - 權威規格：`.specify/memory/constitution.md`（憲法）；完整角色 / 專題 spec 在 `docs/spec-kit/`。
 - Spec Kit 指令（Claude Code）：`/speckit-specify`、`/speckit-plan`、`/speckit-tasks`、`/speckit-implement`（選用 `/speckit-clarify`、`/speckit-analyze`、`/speckit-checklist`）。
