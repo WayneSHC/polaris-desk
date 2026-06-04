@@ -57,15 +57,20 @@ class GeminiClient:
         """單輪文字生成。flash=True 用便宜快速的 Flash 模型。"""
         from google.genai import types  # 延遲 import
 
+        from polaris.compression.tokens import count_tokens
+        from polaris.llm.budget import default_budget
+
         model = settings.gemini_model_flash if flash else settings.gemini_model_pro
-        config = (
-            types.GenerateContentConfig(system_instruction=system_instruction)
-            if system_instruction
-            else None
+        # LLM10：永遠帶 max_output_tokens 上限，擋失控長輸出。
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            max_output_tokens=settings.llm_max_output_tokens,
         )
         resp = self._client.models.generate_content(
             model=model, contents=prompt, config=config
         )
+        # LLM10：把本次估算用量記入 process 預算（超限會 raise，擋住後續呼叫）。
+        default_budget.charge(count_tokens(prompt) + count_tokens(resp.text or ""))
         return resp.text
 
     def embed(self, text: str) -> list[float]:

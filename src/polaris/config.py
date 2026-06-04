@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-2"   # 最新多模態嵌入；純文字可改 gemini-embedding-001
     embedding_dim: int = 768
 
+    # LLM 成本 / 資源護欄（LLM10）
+    llm_max_output_tokens: int = 4096         # 每次生成輸出上限（傳給 Gemini，擋失控長輸出）
+    llm_token_budget: int = 0                 # process 累計 token 上限；0 = 無上限（預設）
+
     # 應用
     app_env: str = "local"                    # local | cloud
     log_level: str = "INFO"
