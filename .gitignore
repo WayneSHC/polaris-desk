@@ -18,6 +18,9 @@ venv/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+# uv 會在 uv run / uv sync 時自動生成；本專案用 uv pip install（不吃 lock），
+# 故不追蹤以免每人 git status 都跳 ?? uv.lock。要做依賴鎖定再改走 uv sync。
+uv.lock
 
 # Node / 前端
 node_modules/
