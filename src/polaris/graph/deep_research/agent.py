@@ -25,6 +25,7 @@ from polaris.graph.deep_research.state import (
     DeepResearchResult,
     ReActStep,
     dedup_evidence,
+    is_fully_traceable,
     should_continue,
 )
 from polaris.graph.nodes import compliance_agent
@@ -83,13 +84,15 @@ def _synthesize(question: str, evidence: Sequence[Citation], *, exhausted: bool 
     """確定性收尾結論（不含買賣建議；引用不足誠實標註）。"""
     if not evidence:
         return f"關於「{question}」目前找不到可溯源的引用，資料不足、無法形成結論。"
-    srcs = "、".join(c.source_id for c in evidence)
+    # 逐點：一條 evidence 一個 bullet + 來源標記 → 句句可溯源 by construction（D16）。
+    points = "\n".join(f"- {c.snippet}（來源：{c.source_id}）" for c in evidence)
     text = (
-        f"關於「{question}」，依據 {len(evidence)} 條引用（{srcs}）整理之事實摘要。"
+        f"關於「{question}」的研究摘要（依據 {len(evidence)} 條引用）：\n"
+        f"{points}\n"
         "本回答僅描述事實與來源，不提供買賣建議。"
     )
     if exhausted and len(evidence) < 3:
-        text += "（註：引用不足 3 條，結論暫定、待補證據。）"
+        text += "\n（註：引用不足 3 條，結論暫定、待補證據。）"
     return text
 
 
@@ -146,6 +149,11 @@ def run_deep_research(
         state["status"] = "exhausted"
         if not state["final_answer"]:
             state["final_answer"] = _synthesize(question, state["evidence"], exhausted=True)
+
+    # D16 句句可溯源硬保證：候選答案（含 LLM 自由文）未通過且有 evidence →
+    # 改用結構化 grounded 摘要（接地 > 文采；LLM 推理仍保留在 react_steps）。
+    if state["evidence"] and not is_fully_traceable(state["final_answer"], state["evidence"]):
+        state["final_answer"] = _synthesize(question, state["evidence"])
 
     # NFR-031：最終結論一律過 D9 Compliance Agent。
     answer, compliance_status = compliance_agent.review(state["final_answer"], client)

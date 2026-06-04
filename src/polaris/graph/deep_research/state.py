@@ -5,6 +5,7 @@ should_continue（loop 守門）、DeepResearchResult（最終輸出）。
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
@@ -14,6 +15,9 @@ from pydantic import BaseModel, ConfigDict
 from polaris.graph.state import Citation
 
 DeepResearchStatus = Literal["running", "answered", "exhausted"]
+
+#: 逐點來源標記：「（來源：<source_id>）」。
+_SOURCE_TAG = re.compile(r"（來源：([^）]+)）")
 
 
 class ReActStep(BaseModel):
@@ -41,6 +45,23 @@ def dedup_evidence(
     return out
 
 
+def is_fully_traceable(answer: str, evidence: Sequence[Citation]) -> bool:
+    """每一條列論點（``- `` 開頭）是否都帶 ``（來源：sid）`` 且 sid ∈ evidence。
+
+    FR-004「句句可溯源」的結構化驗證：至少 1 個論點；header / disclaimer 等
+    非條列行豁免；自由文（無 tagged bullet）→ False。
+    """
+    valid = {c.source_id for c in evidence}
+    bullets = [ln for ln in (answer or "").splitlines() if ln.strip().startswith("-")]
+    if not bullets:
+        return False
+    for line in bullets:
+        match = _SOURCE_TAG.search(line)
+        if not match or match.group(1) not in valid:
+            return False
+    return True
+
+
 def should_continue(state: Mapping, *, max_loops: int = 6) -> bool:
     """是否續跑 ReAct 迴圈：已 answered 或達 ``max_loops`` 硬上限 → 停（FR-004 ≤6）。"""
     if state.get("status") == "answered":
@@ -64,6 +85,7 @@ class DeepResearchResult:
 __all__ = [
     "ReActStep",
     "dedup_evidence",
+    "is_fully_traceable",
     "should_continue",
     "DeepResearchResult",
     "DeepResearchStatus",
