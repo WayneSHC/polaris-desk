@@ -85,3 +85,45 @@ class TestResearch:
 class TestRouting:
     def test_unknown_path_404(self, client):
         assert client.get("/definitely-not-a-route").status_code == 404
+
+
+class TestParseOrigins:
+    def test_splits_strips_and_drops_empties(self):
+        from polaris import api
+
+        assert api._parse_origins("http://a, http://b ,, http://c ") == [
+            "http://a",
+            "http://b",
+            "http://c",
+        ]
+
+
+class TestCORS:
+    def test_allowed_origin_gets_cors_header(self, client):
+        # 預設允許 localhost:3000（Next.js dev）→ R7 前端跨域可呼叫
+        r = client.get("/healthz", headers={"Origin": "http://localhost:3000"})
+        assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+    def test_preflight_options_ask_allowed(self, client):
+        r = client.options(
+            "/ask",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert r.status_code in (200, 204)
+        assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+    def test_disallowed_origin_not_echoed(self, client):
+        # 未列入允許清單的來源不得被 echo（不是萬用 *）
+        r = client.get("/healthz", headers={"Origin": "https://evil.example.com"})
+        assert r.headers.get("access-control-allow-origin") != "https://evil.example.com"
+
+
+class TestBlankInput:
+    def test_blank_query_is_422(self, client):
+        assert client.post("/ask", json={"query": "   "}).status_code == 422
+
+    def test_blank_question_is_422(self, client):
+        assert client.post("/research", json={"question": "  "}).status_code == 422

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     top_k: int = 8
 
+    # R7 前端跨域（CORS）允許來源；逗號分隔。預設本地 dev（Next.js 3000 / Chainlit 8501）；
+    # 雲端設成 R7 的 Vercel 網域（POLARIS_CORS_ORIGINS=https://<r7-domain>）。
+    cors_origins: str = "http://localhost:3000,http://localhost:8501"
+
 
 # 全域單例 —— 其他模組 `from polaris.config import settings`
 settings = Settings()

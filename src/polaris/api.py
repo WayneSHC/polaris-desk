@@ -15,8 +15,10 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator
 
+from polaris.config import settings
 from polaris.graph.deep_research.agent import run_deep_research
 from polaris.graph.deep_research.state import ReActStep
 from polaris.graph.state import Citation, NodeTrace
@@ -30,9 +32,32 @@ app = FastAPI(
 )
 
 
+def _parse_origins(raw: str) -> list[str]:
+    """逗號分隔的 CORS 來源字串 → 清單（strip + 去空）。"""
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+# R7 前端（Vercel）跨域呼叫本 API → 需 CORS allowlist（secure-by-default，非萬用 *）。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_parse_origins(settings.cors_origins),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
 # --- 請求 / 回應模型（回應重用引擎既有 pydantic 型別 → 序列化不會與引擎漂移）---
+def _reject_blank(value: str) -> str:
+    """空白（含全形空白）視同未輸入 → 422，不把垃圾餵進引擎。"""
+    if not value.strip():
+        raise ValueError("不可為空白")
+    return value
+
+
 class AskRequest(BaseModel):
     query: str = Field(min_length=1, description="自然語言問題")
+
+    _not_blank = field_validator("query")(_reject_blank)
 
 
 class AskResponse(BaseModel):
@@ -44,6 +69,8 @@ class AskResponse(BaseModel):
 
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, description="開放式研究問題")
+
+    _not_blank = field_validator("question")(_reject_blank)
 
 
 class ResearchResponse(BaseModel):

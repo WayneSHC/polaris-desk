@@ -75,12 +75,15 @@ gcloud run deploy polaris-api \
   --allow-unauthenticated \
   --port 8000 \
   --service-account polaris-run@polaris-desk-team.iam.gserviceaccount.com \
-  --set-env-vars "APP_ENV=cloud,VECTOR_BACKEND=bigquery,GCP_PROJECT=polaris-desk-team,BQ_DATASET=polaris_core" \
+  --set-env-vars "APP_ENV=cloud,VECTOR_BACKEND=bigquery,GCP_PROJECT=polaris-desk-team,BQ_DATASET=polaris_core,POLARIS_CORS_ORIGINS=https://<r7-vercel-domain>" \
   --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,COHERE_API_KEY=cohere-api-key:latest,TAVILY_API_KEY=tavily-api-key:latest"
 ```
 
 - **非敏感設定**（`APP_ENV` / `VECTOR_BACKEND` / `GCP_PROJECT` / `BQ_DATASET`）→ `--set-env-vars`。
   對齊 `polaris/config.py` 的 `Settings` 欄位（同一份程式、雲端只換環境變數）。
+- **`POLARIS_CORS_ORIGINS`**：R7 前端（Vercel）跨域呼叫本 API 的允許來源。**部署時換成 R7 實際的
+  Vercel 網域**（如 `https://polaris-desk.vercel.app`，多個逗號分隔）。本地 dev 預設已含
+  `http://localhost:3000`（Next.js）/ `:8501`（Chainlit）。不設＝只允許本地，R7 線上會被 CORS 擋。
 - **金鑰** → `--set-secrets`（Cloud Run 執行期掛載成環境變數，映像裡沒有）。
 
 ---
