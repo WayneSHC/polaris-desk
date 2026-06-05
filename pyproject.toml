@@ -24,6 +24,9 @@ dependencies = [
     "google-cloud-bigquery>=3.25",
     # D8 prompt 壓縮量測：token 計數（離線、確定性）
     "tiktoken>=0.7",
+    # W4 thin API：後端 HTTP 入口（Cloud Run + R7 Vercel 對接；純 Python、無 torch）
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -50,6 +53,10 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 # 不收集 Google Drive / macOS 同步衝突副本（如 "test_cli 2.py"），避免重複計數
 addopts = ["--ignore-glob=* [0-9].py"]
+# 第三方雜訊：fastapi TestClient 對 httpx/starlette 的 deprecation（非本專案碼，輸出保持乾淨）
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient`.*",
+]
 
 [tool.ruff]
 line-length = 100

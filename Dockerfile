@@ -26,7 +26,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Cloud Run 會以 $PORT 注入監聽埠；本地預設 8000（見 polaris/server.py:resolve_port）
 EXPOSE 8000
 
-# W4 上雲 prep：先起「健康檢查骨架」server（GET /healthz），讓容器能在 Cloud Run
-# 真正啟動並通過健康探針。產品 /ask 端點＝之後的 API 任務，屆時改成：
-#   CMD ["python", "-m", "uvicorn", "polaris.api:app", "--host", "0.0.0.0", "--port", "8000"]
-CMD ["python", "-m", "polaris.server"]
+# W4：thin FastAPI 後端（GET /healthz · POST /ask · POST /research，見 polaris/api.py）。
+# uvicorn 監聽 $PORT（Cloud Run 注入）。無金鑰時引擎走 fallback，API 仍可回應。
+# 離線 / 無 FastAPI 的純健康檢查另有 `python -m polaris.server`（stdlib 零依賴）。
+CMD ["python", "-m", "polaris.api"]
