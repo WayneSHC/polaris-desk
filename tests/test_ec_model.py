@@ -58,3 +58,18 @@ def test_build_filename_unknown_date():
         date_source="unknown", source_url="u", source_page="p",
     )
     assert build_filename(d, 1) == "2891_00000000M001_2026Q1_concall_presentation.pdf"
+
+
+from ec_companies import lookup
+
+
+def test_lookup_known_company_ctbc():
+    info = lookup("2891")
+    assert info is not None
+    assert info["name"] == "中信金控"
+    assert info["vendor"] == "todayir"
+    assert "{year}" in info["page_tmpl"]
+
+
+def test_lookup_unknown_returns_none():
+    assert lookup("9999") is None
