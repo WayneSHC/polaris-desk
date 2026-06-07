@@ -62,3 +62,89 @@ def assign_filenames(docs: list[Doc], blobs: dict[str, bytes]) -> list[tuple[Doc
         counter[key] += 1
         named.append((d, build_filename(d, counter[key])))
     return named
+
+
+def event_date_from_pdf(pdf_bytes: bytes) -> tuple[str, str]:
+    """用 pdftotext 抽首頁日期 → (ISO, 'pdf_first_page')；失敗回 ('', 'unknown')。"""
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
+        f.write(pdf_bytes)
+        f.flush()
+        try:
+            txt = subprocess.run(
+                ["pdftotext", "-f", "1", "-l", "1", "-layout", f.name, "-"],
+                capture_output=True, text=True, check=False, timeout=30,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            return "", "unknown"
+    iso = parse_roc_date(txt)
+    return (iso, "pdf_first_page") if iso else ("", "unknown")
+
+
+def resolve_docs(stock_id: str, years: list[int]) -> tuple[str, list[Doc]]:
+    """跑命中的 vendor adapter + MOPS 底層，回 (company_name, docs)。"""
+    info = ec_companies.lookup(stock_id)
+    docs: list[Doc] = []
+    company = info["name"] if info else stock_id
+    for ad in ADAPTERS:
+        if info and ad.supports(stock_id, info):
+            docs += ad.fetch(stock_id, years, http_get, info)
+    docs += ec_mops.fetch(stock_id, years, http_get)
+    return company, docs
+
+
+def run(stock_id: str, years: list[int], out_dir: Path) -> list[dict]:
+    company, docs = resolve_docs(stock_id, years)
+    if not docs:
+        print(f"查無 {stock_id} 的法說會記錄（已試 vendor adapter + MOPS 底層）。", file=sys.stderr)
+        return []
+    blobs = {d.source_url: http_get(d.source_url) for d in {d.source_url: d for d in docs}.values()}
+    # 補 event_date（adapter 來源沒日期者，用 PDF 首頁）
+    enriched: list[Doc] = []
+    for d in docs:
+        if not d.event_date and d.source_url in blobs:
+            iso, src = event_date_from_pdf(blobs[d.source_url])
+            d = Doc(**{**d.__dict__, "event_date": iso, "date_source": src})
+        enriched.append(d)
+    named = assign_filenames(enriched, blobs)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fetched_at = date.today().isoformat()
+    manifest: list[dict] = []
+    n_transcript = 0
+    for d, fname in named:
+        data = blobs[d.source_url]
+        (out_dir / fname).write_bytes(data)
+        n_transcript += d.doc_type == "transcript"
+        manifest.append({
+            "file": fname, "stock_id": d.stock_id, "company": company,
+            "doc_type": d.doc_type, "fiscal_period": d.fiscal_period, "lang": d.lang,
+            "event_date": d.event_date, "date_source": d.date_source,
+            "source_url": d.source_url, "source_page": d.source_page,
+            "fetched_at": fetched_at, "md5": hashlib.md5(data).hexdigest(),  # noqa: S324
+            "bytes": len(data),
+        })
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"下載 {len(manifest)} 份到 {out_dir}/（presentation {len(manifest)-n_transcript}、transcript {n_transcript}）")
+    if n_transcript == 0:
+        print(f"註：{company}（{stock_id}）無公開 transcript，manifest 僅列簡報。")
+    return manifest
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--stock-id", required=True)
+    ap.add_argument("--from", dest="y_from", type=int, default=2021)
+    ap.add_argument("--to", dest="y_to", type=int, default=date.today().year)
+    ap.add_argument("--out", default=None)
+    args = ap.parse_args()
+    years = list(range(args.y_from, args.y_to + 1))
+    info = ec_companies.lookup(args.stock_id)
+    name = info["name"] if info else args.stock_id
+    out = Path(args.out) if args.out else Path("data") / f"{args.stock_id}_{name}"
+    run(args.stock_id, years, out)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
