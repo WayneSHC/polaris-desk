@@ -69,3 +69,16 @@ class FakeLLM:
 def no_retry_sleep(monkeypatch):
     """把 retry 退避等待換成 no-op —— 會觸發重試的測試用它避免真的 sleep。"""
     monkeypatch.setattr(retry, "default_sleep", lambda _s: None)
+
+
+# ── fetch-tw-earnings-call skill path wiring ─────────────────────────────────
+# 讓 tests 能 import skill 的 stdlib-only 模組（不進 polaris 套件、保持可攜）。
+import sys
+from pathlib import Path
+
+_SKILL_SCRIPTS = (
+    Path(__file__).resolve().parent.parent
+    / ".claude" / "skills" / "fetch-tw-earnings-call" / "scripts"
+)
+if str(_SKILL_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SKILL_SCRIPTS))
