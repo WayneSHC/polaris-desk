@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ec_model import Doc
-from fetch_earnings_call import assign_filenames, dedupe_by_content
+from fetch_earnings_call import assign_filenames, dedupe_by_content, merge_by_key
 
 
 def _doc(period="2026Q1", lang="zh", url="u1", date="2026-05-19"):
@@ -38,9 +38,6 @@ def test_assign_filenames_separates_lang_sequence():
     named = dict((d.source_url, n) for d, n in assign_filenames([zh, en], blobs))
     assert "M001" in named["u1"]
     assert "E001" in named["u2"]
-
-
-from fetch_earnings_call import merge_by_key
 
 
 def test_merge_by_key_collapses_same_period_lang_doctype():
