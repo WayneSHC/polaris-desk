@@ -11,6 +11,9 @@ D7 retry：``FakeLLM`` 可設定 ``fail_times`` / ``error`` 模擬暫時性 / �
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pytest
 
 from polaris import retry
@@ -73,9 +76,6 @@ def no_retry_sleep(monkeypatch):
 
 # ── fetch-tw-earnings-call skill path wiring ─────────────────────────────────
 # 讓 tests 能 import skill 的 stdlib-only 模組（不進 polaris 套件、保持可攜）。
-import sys
-from pathlib import Path
-
 _SKILL_SCRIPTS = (
     Path(__file__).resolve().parent.parent
     / ".claude" / "skills" / "fetch-tw-earnings-call" / "scripts"

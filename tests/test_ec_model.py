@@ -1,6 +1,7 @@
 """ec_model 純函式：期別正規化、ROC 日期解析、檔名產生。"""
 from __future__ import annotations
 
+from ec_companies import lookup
 from ec_model import Doc, build_filename, cn_quarter_num, month_to_quarter, parse_roc_date, to_period
 
 
@@ -58,9 +59,6 @@ def test_build_filename_unknown_date():
         date_source="unknown", source_url="u", source_page="p",
     )
     assert build_filename(d, 1) == "2891_00000000M001_2026Q1_concall_presentation.pdf"
-
-
-from ec_companies import lookup
 
 
 def test_lookup_known_company_ctbc():
