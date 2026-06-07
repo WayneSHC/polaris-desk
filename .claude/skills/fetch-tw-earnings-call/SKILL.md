@@ -17,7 +17,7 @@ Results merge and dedupe by content md5.
 
 ## Usage
 ```bash
-python .claude/skills/fetch-tw-earnings-call/scripts/fetch_earnings_call.py \
+python3 .claude/skills/fetch-tw-earnings-call/scripts/fetch_earnings_call.py \
     --stock-id 2891 --from 2021 --to 2026
 # output: data/2891_中信金控/<files>.pdf + manifest.json
 ```
