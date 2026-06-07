@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 LANG_FLAG = {"zh": "M", "en": "E"}  # M=中文 E=英文（使用者指定）
-_MONTH_Q = {"03": 1, "06": 2, "09": 3, "12": 4, "3": 1, "6": 2, "9": 3}
+_MONTH_Q = {"03": 1, "06": 2, "09": 3, "12": 4}
 _CN_Q = {"一": 1, "二": 2, "三": 3, "四": 4}
 _ROC_DATE = re.compile(r"(?:民國)?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日")
 _WEST_DATE = re.compile(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日")
@@ -25,7 +25,7 @@ class Doc:
 
 
 def month_to_quarter(mm: str) -> int:
-    return _MONTH_Q[mm.zfill(2)] if mm.zfill(2) in _MONTH_Q else _MONTH_Q[mm]
+    return _MONTH_Q[mm.zfill(2)]
 
 
 def cn_quarter_num(cn: str) -> int:
