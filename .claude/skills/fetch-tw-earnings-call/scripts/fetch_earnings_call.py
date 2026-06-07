@@ -64,6 +64,22 @@ def assign_filenames(docs: list[Doc], blobs: dict[str, bytes]) -> list[tuple[Doc
     return named
 
 
+def merge_by_key(docs: list[Doc]) -> list[Doc]:
+    """每 (fiscal_period, lang, doc_type) 只留一份；先到者優先（resolve_docs 讓 adapter 先於 MOPS）。
+
+    處理跨來源同一場法說會的重複：TodayIR 與 MOPS 的同季同語言簡報即使位元組不同
+    （重存版本），仍視為同一份，留公司 IR（adapter）那份。
+    """
+    best: dict[tuple[str, str, str], Doc] = {}
+    order: list[tuple[str, str, str]] = []
+    for d in docs:
+        key = (d.fiscal_period, d.lang, d.doc_type)
+        if key not in best:
+            best[key] = d
+            order.append(key)
+    return [best[k] for k in order]
+
+
 def event_date_from_pdf(pdf_bytes: bytes) -> tuple[str, str]:
     """用 pdftotext 抽首頁日期 → (ISO, 'pdf_first_page')；失敗回 ('', 'unknown')。"""
     with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
@@ -105,7 +121,8 @@ def run(stock_id: str, years: list[int], out_dir: Path) -> list[dict]:
             iso, src = event_date_from_pdf(blobs[d.source_url])
             d = Doc(**{**d.__dict__, "event_date": iso, "date_source": src})
         enriched.append(d)
-    named = assign_filenames(enriched, blobs)
+    merged = merge_by_key(enriched)
+    named = assign_filenames(merged, blobs)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     fetched_at = date.today().isoformat()

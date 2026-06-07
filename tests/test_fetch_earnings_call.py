@@ -38,3 +38,23 @@ def test_assign_filenames_separates_lang_sequence():
     named = dict((d.source_url, n) for d, n in assign_filenames([zh, en], blobs))
     assert "M001" in named["u1"]
     assert "E001" in named["u2"]
+
+
+from fetch_earnings_call import merge_by_key
+
+
+def test_merge_by_key_collapses_same_period_lang_doctype():
+    # 兩個來源給同季同語言、但 URL/內容不同 → 只留先到者（adapter 優先）
+    a = _doc(period="2026Q1", lang="zh", url="todayir")   # 先到＝adapter
+    b = _doc(period="2026Q1", lang="zh", url="mops")
+    merged = merge_by_key([a, b])
+    assert len(merged) == 1
+    assert merged[0].source_url == "todayir"
+
+
+def test_merge_by_key_keeps_distinct_lang_and_period():
+    zh = _doc(period="2026Q1", lang="zh", url="u1")
+    en = _doc(period="2026Q1", lang="en", url="u2")
+    q2 = _doc(period="2025Q4", lang="zh", url="u3")
+    merged = merge_by_key([zh, en, q2])
+    assert len(merged) == 3
