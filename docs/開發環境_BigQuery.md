@@ -10,13 +10,16 @@
 
 ## 怎麼設定（每人一次，約 3 分鐘）
 
-前提：你的 gmail 已被加進權限（`polaris_core` READER + 專案 `bigquery.user`，已由 SOP §3.4 開好）。
+前提：你的 gmail 已被加進權限（`polaris_core` READER + 專案 `bigquery.user`，已由 SOP §3.4 開好）。本機跑 BigQuery 還需要專案層 `roles/serviceusage.serviceUsageConsumer`（設 ADC quota project 用），同樣由 SOP §3.4 開。
 
 ```bash
-# 1) 認證（ADC）
+# 1) 認證（ADC）— 一定要先 login 再 set-quota-project，否則 quota project 沒有身分可掛
 gcloud auth login
 gcloud auth application-default login
 gcloud config set project polaris-desk-team
+gcloud auth application-default set-quota-project polaris-desk-team
+# 若報 "serviceusage.services.use" 缺權限 → 缺 serviceUsageConsumer，回頭找 PM 補（SOP §3.4）
+# 若報 "unregistered callers" → ADC 沒登入，或 GOOGLE_APPLICATION_CREDENTIALS 指到壞檔；先 unset 再重跑 login
 
 # 2) .env（cp .env.example .env 後預設值已是 BigQuery）
 #    VECTOR_BACKEND=bigquery
@@ -36,8 +39,9 @@ bq query --use_legacy_sql=false \
 
 ## 日常守則（重要）
 
-- **讀 `polaris_core`、寫 `polaris_dev_<name>`**。永遠不要寫 `polaris_core`（只有 R4 是 OWNER）。
-- 查詢帶 `published_at` 範圍 + `stock_id`；大查詢先 `bq query --dry_run` 估成本。
+- **讀 `polaris_core`、寫 `polaris_dev_<name>`**。一般開發者永遠不要寫 `polaris_core`。
+  - 例外（2026-06-08 經 PM 同意）：`polaris_core` 的 WRITER 已擴大到 R4（人帳號 OWNER + GCE 預設 SA WRITER）與 R1（WRITER）；其餘成員仍唯讀。即便是這兩人，schema／index 變更仍走 SOP §7 PR，別直接動 canonical 結構。細節與風險見 SOP §3.4。
+- 查詢帶 `published_at` 範圍 + `ticker`；大查詢先 `bq query --dry_run` 估成本。
 - 不要自己重建 index / 重跑 ingestion；要改 schema 走 SOP §7 的 PR 流程。
 
 ## 測試還是離線的
@@ -62,7 +66,7 @@ make db-up
 ## 給 AI agent 的提醒
 
 - **預設後端是 `bigquery`，不要改回 `pgvector` 預設**（fallback 只在離線情境手動切）。
-- 寫入一律進 `polaris_dev_<name>`，**不可寫 `polaris_core`**。
+- 寫入一律進 `polaris_dev_<name>`，**不可寫 `polaris_core`**（例外僅 R1／R4 的 ingestion，見上方守則）。
 - 金鑰 / 認證**不要碰**（人自己 `gcloud auth ...`）；別把任何 key 寫進檔案或 commit。
 
 ---

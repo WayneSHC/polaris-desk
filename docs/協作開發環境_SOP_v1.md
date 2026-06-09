@@ -22,12 +22,13 @@
 
 | 角色 | 權責 | 對 `polaris_core` 權限 |
 | --- | --- | --- |
-| 角色 1（PM） | 維護本 SOP、建立專案、設定預算告警、核准 schema 變更 PR | READER |
-| 角色 4（資料工程師） | 建置基礎設施、唯一可寫入 canonical 的人、跑 ingestion | OWNER／WRITER |
+| 角色 1（PM／R1） | 維護本 SOP、建立專案、設定預算告警、核准 schema 變更 PR | WRITER（2026-06-08 起，破例升級） |
+| 角色 4（資料工程師） | 建置基礎設施、跑 ingestion、寫入 canonical | OWNER／WRITER（人帳號 + GCE 預設 SA） |
 | 角色 2（AI 架構師） | 審查 schema migration、retrieval 設定 | READER |
 | 其餘開發者 | 讀 core、在自己的 scratch 做實驗 | READER |
 
-> 只有角色 4 能寫入 `polaris_core`。其他人一律唯讀。
+> ~~只有角色 4 能寫入 `polaris_core`。其他人一律唯讀。~~
+> **2026-06-08 更新**：經 PM 同意破例，`polaris_core` 的 WRITER 已擴大到 R4（人帳號 OWNER + GCE 預設 SA WRITER）與 R1（WRITER）；其餘成員仍唯讀。詳見 §3.4 變更註記與風險說明。schema／index 變更仍一律走 §7 PR。
 
 ---
 
@@ -94,6 +95,15 @@ bq --location=asia-east1 mk --dataset \
 
 **專案層角色用 `roles/bigquery.user`，不是 `jobUser`**：`jobUser` 只能跑查詢、**不能建 dataset**，會卡住 §5 步驟 2（每人要建自己的 scratch）。`bigquery.user` = 跑 job ＋ 建自己的 dataset，但**不會**自動取得任何 dataset 的資料讀取權（讀 `polaris_core` 仍要下方 dataset 層 READER）。
 
+**本機跑 BigQuery（ADC）還要 `roles/serviceusage.serviceUsageConsumer`**：在本機用 `gcloud auth application-default login` + `set-quota-project polaris-desk-team` 時，設定 quota project 需要 `serviceusage.services.use` 權限，只在這個角色裡。少了它會卡在 `set-quota-project`，報 `does not have the "serviceusage.services.use" permission`。所以本機開發者要同時綁 `bigquery.user` ＋ `serviceUsageConsumer`。指令：
+
+```bash
+for m in "${MEMBERS[@]}"; do
+  gcloud projects add-iam-policy-binding polaris-desk-team \
+    --member="user:$m" --role="roles/serviceusage.serviceUsageConsumer" --condition=None
+done
+```
+
 ```bash
 # 把成員的 gmail 填進來（owner/PM 不用列）
 MEMBERS=(
@@ -123,9 +133,20 @@ bq show --format=prettyjson polaris-desk-team:polaris_core > core_access.json
 bq update --source=core_access.json polaris-desk-team:polaris_core
 ```
 
-> **實際已綁定（2026-06-02）**：6 位成員專案層 `roles/bigquery.user`；`polaris_core` dataset → R4（吳瑾瑜）`OWNER`、其餘 5 位 `READER`、PM 為 creator/`OWNER`。
+> **實際已綁定（2026-06-02 初設）**：6 位成員專案層 `roles/bigquery.user`；`polaris_core` dataset → R4（吳瑾瑜）`OWNER`、其餘 5 位 `READER`、PM 為 creator/`OWNER`。
+>
+> **2026-06-08 變更（破例，已獲 PM 同意）**：為了讓 R1／R4 能直接寫入 canonical，`polaris_core` 的 WRITER 名單已擴大，**不再是「只有 R4 能寫」**：
+> - `holajennytw@gmail.com`（R4 ingester 人帳號）→ `OWNER`
+> - `736393260540-compute@developer.gserviceaccount.com`（R4 runtime 用的 GCE 預設 SA）→ `WRITER`
+> - `hbb97.tw@gmail.com`（R1）→ `WRITER`（由原 READER 升級）
+> - R1／R4 人帳號另綁專案層 `roles/serviceusage.serviceUsageConsumer`（本機 ADC 用）
+>
+> ⚠️ 兩點風險：(1) 用的是 GCE **預設** SA，專案內任何跑在預設 SA 上的服務都能寫 `polaris_core`，較鬆；要收緊可改建專用 SA（例如 `r4-ingester@`）只授這個 dataset。(2) 多人可寫 canonical → schema／index 變更要走 §7 PR 流程，別各自直接改。這牴觸憲法「🔴 不可寫 `polaris_core`／只有 R4 寫 core」，屬團隊有意識的破例，若日後收回請同步改回本段與下方 §1／§9 表格。
+>
+> **2026-06-09 補綁**：R5（楊宗勲，`arronyang0416@gmail.com`，Eval Lead）一次開齊本機開發三件套——專案層 `roles/bigquery.user` ＋ `roles/serviceusage.serviceUsageConsumer`、`polaris_core` dataset 層 `READER`。W2 e2e 切真資料前先把權限備齊，避免卡在申請等待。
+>
 > 應用程式用的 service account 採最小權限，金鑰存進 Secret Manager，**不進版控**。
-> 新增／移除成員時，記得同步更新專案層 `bigquery.user` 綁定與 `polaris_core` 的 READER 名單。
+> 新增／移除成員時，記得同步更新專案層 `bigquery.user`／`serviceUsageConsumer` 綁定與 `polaris_core` 的 READER／WRITER 名單。
 
 ### 3.5 設定成本護欄（重要）
 
@@ -282,7 +303,9 @@ bq query --use_legacy_sql=false \
 | --- | --- | --- |
 | 查 core 報 permission denied | 你的 gmail 沒被綁定，或缺 `bigquery.user` | 確認帳號已加入 §3.4 的 `user:` 名單（專案層 `bigquery.user` + `polaris_core` READER） |
 | 建不了自己的 scratch dataset | 只有 `jobUser`、缺 `datasets.create` | 確認專案層角色是 `roles/bigquery.user`（非 `jobUser`） |
-| 查詢費用異常高 | 沒帶 partition filter，全表掃描 | 加 `published_at` 範圍與 `stock_id` 條件，先 dry-run |
+| `set-quota-project` 報 `serviceusage.services.use` 缺權限 | 本機 ADC 設 quota project 需要 `serviceUsageConsumer` | 綁專案層 `roles/serviceusage.serviceUsageConsumer`（見 §3.4） |
+| `Method doesn't allow unregistered callers`／`unregistered callers` | 請求完全沒帶身分＝ADC 沒登入或被 `GOOGLE_APPLICATION_CREDENTIALS` 指到壞檔 | 本機：`gcloud auth application-default login` 再 `set-quota-project`；檢查並 `unset GOOGLE_APPLICATION_CREDENTIALS`。GCE/Cloud Run：確認跑在有 BQ 權限的 SA 上 |
+| 查詢費用異常高 | 沒帶 partition filter，全表掃描 | 加 `published_at` 範圍與 `ticker` 條件，先 dry-run |
 | 寫入失敗 | 誤把目標設成 `polaris_core` | 確認寫入目標是 `polaris_dev_<name>` |
 | 大家資料對不上 | 有人在 scratch 改了卻當成 canonical | 一律以 `polaris_core` 為準，scratch 只是個人實驗 |
 | VECTOR INDEX 建立失敗 | REGION 不支援，或表 < 5,000 列 | 改用支援的鄰近區域（更新 §2）；列數不足則等資料補足或接受暴力搜尋 |
@@ -295,7 +318,7 @@ bq query --use_legacy_sql=false \
 - [x] 單一團隊 project `polaris-desk-team` 已建立並開啟計費
 - [ ] 預算告警與 per-user 配額已設定
 - [x] `gs://polaris-desk-raw` 已建立
-- [x] `polaris_core` 已建立，6 位成員專案層 `bigquery.user`；dataset 層 5 READER + R4 OWNER
+- [x] `polaris_core` 已建立，6 位成員專案層 `bigquery.user`；dataset 層：R4 OWNER + R1 WRITER + R4 GCE 預設 SA WRITER，其餘 READER（2026-06-08 破例擴大，見 §3.4）
 - [ ] canonical（chunks / embeddings / VECTOR INDEX / 財務指標 / ontology）已 ingest 一次
 - [ ] 7 位成員各自建立 scratch dataset 並通過讀取驗證
 - [ ] config 模組（`PROJECT_ID` / `CORE_DATASET`）已進版控
@@ -304,6 +327,7 @@ bq query --use_legacy_sql=false \
 
 ---
 
-_版本：v1.2　|　對應 PRD：§13.4（向量檢索）、§23（部署）、§24（成本）_
+_版本：v1.3　|　對應 PRD：§13.4（向量檢索）、§23（部署）、§24（成本）_
+_v1.3 變更（2026-06-08）：經 PM 同意破例擴大 `polaris_core` WRITER（R1 升 WRITER、R4 GCE 預設 SA 加 WRITER），不再是「只有 R4 寫 core」；§3.4 補上本機 ADC 需 `serviceUsageConsumer`；§1 角色表、§3.4 變更註記＋風險、§9 排查（`serviceusage.services.use`／unregistered callers）、§10 清單同步更新。憲法層「不可寫 `polaris_core`」仍為原則，本次為有意識破例。_
 _v1.2 變更（2026-06-02）：§3.1–§3.4 已實際執行完成（API／bucket／空 `polaris_core`／6 人權限）；專案層角色由 `bigquery.jobUser` 修正為 `roles/bigquery.user`（jobUser 無法建 scratch dataset，會卡 §5）；§3.4 改為一般成員 READER、角色 4 OWNER；§9、§10 同步更新。_
 _v1.1 變更：專案改用乾淨 Project ID `polaris-desk-team`；IAM 從 Google Group 改為個別 `user:` 綁定（團隊用個人 gmail、無 Workspace 網域）；補上 Phase 0 現況、向量索引 region／5,000 列前提，與 Project ID vs 顯示名稱排查。_

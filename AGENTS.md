@@ -34,7 +34,7 @@ make setup     # 建 Python 3.13 venv + 裝依賴 + 產生 .env 範本（idempot
 - 🔑 **金鑰**只放 `.env` / Secret Manager，**永不 commit**（`.env` 已 gitignore；只有 `.env.example` 範本進 git）。
 - **引用接地**：每句結論 / 每個數字都要有來源。
 - **技術棧**：`google-genai` 新 SDK + `gemini-3-*-preview` + `gemini-embedding-2`（768 維 / cosine），**非**舊版 `google-generativeai`。
-- **向量庫**：**預設 `VECTOR_BACKEND=bigquery`**（共用 canonical `polaris_core`；2026-06-02 起為開發後端）。pgvector 改為離線 / Demo fallback（一個 env 切換）。**不要把預設改回 pgvector。** 寫入一律進自己的 `polaris_dev_<name>`、**不可寫 `polaris_core`**。pgvector fallback 查詢用 `<=>`（不要用 `<->` / `<#>`）。完整做法見 `docs/開發環境_BigQuery.md` + `docs/協作開發環境_SOP_v1.md`。
+- **向量庫**：**預設 `VECTOR_BACKEND=bigquery`**（共用 canonical `polaris_core`；2026-06-02 起為開發後端）。pgvector 改為離線 / Demo fallback（一個 env 切換）。**不要把預設改回 pgvector。** 寫入一律進自己的 `polaris_dev_<name>`、**不可寫 `polaris_core`**（例外：2026-06-08 起經 PM 同意，R1／R4 帳號 + R4 GCE 預設 SA 有 `polaris_core` WRITER 做 ingestion；一般開發者與 agent 仍不可寫，schema/index 變更走 SOP §7 PR — 別自行「修正」這份 ACL）。pgvector fallback 查詢用 `<=>`（不要用 `<->` / `<#>`）。完整做法見 `docs/開發環境_BigQuery.md` + `docs/協作開發環境_SOP_v1.md` §3.4。
 
 ## 協作流程
 
