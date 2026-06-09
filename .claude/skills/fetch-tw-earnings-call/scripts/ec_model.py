@@ -53,6 +53,6 @@ def build_filename(d: Doc, seq: int, ext: str = "pdf") -> str:
     date_token = d.event_date.replace("-", "") if d.event_date else "00000000"
     flag = LANG_FLAG[d.lang]
     return (
-        f"{d.ticker}_{date_token}{flag}{seq:03d}_"
+        f"{d.ticker}_{date_token}{flag}{seq:02d}_"
         f"{d.fiscal_period}_concall_{d.doc_type}.{ext}"
     )

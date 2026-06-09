@@ -26,11 +26,11 @@ Options: `--ticker` (required), `--from`/`--to` (year range, default 2021..curre
 `--out` (default `data/<ticker>_<name>`).
 
 ## Output naming
-`<ticker>_<yyyymmdd><L><nnn>_<period>_concall_<doctype>.pdf`
+`<ticker>_<yyyymmdd><L><nn>_<period>_concall_<doctype>.pdf`
 - `yyyymmdd` = 法說會 held date (from PDF first page; falls back to source listing date)
-- `L` = `M` (中文) / `E` (英文); `nnn` = per (ticker, date, lang) sequence from 001
+- `L` = `M` (中文) / `E` (英文); `nn` = per (ticker, date, lang) sequence from 01
 - `period` = `YYYYQn`; `doctype` = `presentation` | `transcript`
-- e.g. `2891_20260519M001_2026Q1_concall_presentation.pdf`
+- e.g. `2891_20260519M01_2026Q1_concall_presentation.pdf`
 
 ## Coverage
 Companies in the registry (`ec_companies.py`) with a vendor adapter get zh+en + transcript.

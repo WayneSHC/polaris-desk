@@ -28,16 +28,16 @@ def test_assign_filenames_sequences_same_period_lang():
     blobs = {"u1": b"AAA", "u2": b"BBB"}
     named = assign_filenames([a, b], blobs)
     names = sorted(n for _, n in named)
-    assert names[0].endswith("M001_2026Q1_concall_presentation.pdf")
-    assert names[1].endswith("M002_2026Q1_concall_presentation.pdf")
+    assert names[0].endswith("M01_2026Q1_concall_presentation.pdf")
+    assert names[1].endswith("M02_2026Q1_concall_presentation.pdf")
 
 
 def test_assign_filenames_separates_lang_sequence():
     zh, en = _doc(lang="zh", url="u1"), _doc(lang="en", url="u2")
     blobs = {"u1": b"AAA", "u2": b"BBB"}
     named = dict((d.source_url, n) for d, n in assign_filenames([zh, en], blobs))
-    assert "M001" in named["u1"]
-    assert "E001" in named["u2"]
+    assert "M01" in named["u1"]
+    assert "E01" in named["u2"]
 
 
 def test_merge_by_key_collapses_same_period_lang_doctype():

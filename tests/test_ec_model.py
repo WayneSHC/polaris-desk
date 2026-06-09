@@ -40,7 +40,7 @@ def test_build_filename_zh_presentation():
         fiscal_period="2026Q1", lang="zh", event_date="2026-05-19",
         date_source="pdf_first_page", source_url="u", source_page="p",
     )
-    assert build_filename(d, 1) == "2891_20260519M001_2026Q1_concall_presentation.pdf"
+    assert build_filename(d, 1) == "2891_20260519M01_2026Q1_concall_presentation.pdf"
 
 
 def test_build_filename_en_transcript_seq2():
@@ -49,7 +49,7 @@ def test_build_filename_en_transcript_seq2():
         fiscal_period="2025Q4", lang="en", event_date="2026-01-16",
         date_source="source_listing", source_url="u", source_page="p",
     )
-    assert build_filename(d, 2) == "2330_20260116E002_2025Q4_concall_transcript.pdf"
+    assert build_filename(d, 2) == "2330_20260116E02_2025Q4_concall_transcript.pdf"
 
 
 def test_build_filename_unknown_date():
@@ -58,7 +58,7 @@ def test_build_filename_unknown_date():
         fiscal_period="2026Q1", lang="zh", event_date="",
         date_source="unknown", source_url="u", source_page="p",
     )
-    assert build_filename(d, 1) == "2891_00000000M001_2026Q1_concall_presentation.pdf"
+    assert build_filename(d, 1) == "2891_00000000M01_2026Q1_concall_presentation.pdf"
 
 
 def test_lookup_known_company_ctbc():
