@@ -73,15 +73,24 @@ class TestE2EDeterminism:
     """同問題連跑 3 次，除了 elapsed_ms，其他欄位 byte-identical。"""
 
     def test_three_runs_identical(self, app):
+        from polaris.llm.gemini import available as gemini_available
+
         runs = [app.invoke({"query": SAMPLE_QUERY}) for _ in range(3)]
 
-        # 純資料欄位：完全相同
-        for key in ("answer", "plan", "contexts", "calculations",
-                    "draft", "citations", "compliance_status"):
+        # 結構性欄位：無論有無 LLM 都必須相同（retriever/calculator/citations 全確定性）
+        for key in ("contexts", "calculations", "citations", "compliance_status"):
             values = [r.get(key) for r in runs]
             assert values[0] == values[1] == values[2], (
                 f"non-deterministic field: {key} → {values}"
             )
+
+        # LLM 生成欄位：stub 模式（無金鑰）才驗字串完全一致；有真金鑰時 LLM 自然存在微變異
+        if not gemini_available():
+            for key in ("answer", "plan", "draft"):
+                values = [r.get(key) for r in runs]
+                assert values[0] == values[1] == values[2], (
+                    f"non-deterministic field: {key} → {values}"
+                )
 
     def test_trace_structure_identical_except_elapsed_ms(self, app):
         runs = [app.invoke({"query": SAMPLE_QUERY}) for _ in range(3)]

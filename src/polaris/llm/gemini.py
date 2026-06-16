@@ -65,6 +65,7 @@ class GeminiClient:
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             max_output_tokens=settings.llm_max_output_tokens,
+            temperature=0.0,
         )
         resp = self._client.models.generate_content(
             model=model, contents=prompt, config=config

@@ -94,9 +94,9 @@ def fallback_draft(query: str, contexts: list[dict[str, Any]]) -> str:  # noqa: 
 
 
 def llm_draft(query: str, contexts: list[dict[str, Any]], client: _LLM) -> str:
-    """用 Gemini Pro 依 contexts 撰寫草稿。"""
+    """用 Gemini Flash 依 contexts 撰寫草稿（gemini-3-pro-preview 已 EOL，改用 Flash）。"""
     return client.generate(
-        _build_prompt(query, contexts), flash=False, system_instruction=SYSTEM_PROMPT
+        _build_prompt(query, contexts), flash=True, system_instruction=SYSTEM_PROMPT
     )
 
 
