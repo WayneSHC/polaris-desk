@@ -60,7 +60,7 @@ class TestLLMDraft:
         draft = wa.llm_draft("台積電營收", SAMPLE_CONTEXTS, client)
 
         assert draft == "依據 doc-1，營收成長。"
-        assert client.calls[0]["flash"] is False  # 撰寫用 Pro
+        assert client.calls[0]["flash"] is True  # gemini-3-pro-preview EOL → Flash
         assert client.calls[0]["system_instruction"]
         assert "台積電營收" in client.calls[0]["prompt"]
         assert "台積電 2025Q1 營收 8,000 億元。" in client.calls[0]["prompt"]
