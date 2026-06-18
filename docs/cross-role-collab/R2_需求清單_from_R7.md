@@ -3,9 +3,21 @@
 > 整理日期：2026-06-17｜撰寫：R7
 > 本文件列出前端需要 R2 決策或協作的事項，含現況說明與前端所需規格。
 
+> ## ✅ R2 決議（2026-06-18）
+> 兩項都已拍板，**完整串接做法見 [`Auth-Firestore_串接指南_R2決議.md`](./Auth-Firestore_串接指南_R2決議.md)**。
+>
+> | # | 項目 | 決議 |
+> |---|---|---|
+> | 1 | Auth 框架 | **NextAuth.js + Google OAuth**；後端 app 層驗 Google id_token（`aud`=client_id），`sub` 當使用者主鍵 |
+> | 1 | **Magic Link** | ❌ **砍**（只 Google OAuth；省寄信服務一個坑）→ R7 移除設定頁 Magic Link UI |
+> | 2 | 紀錄 / 訂閱儲存 | **Firestore**（GCP 原生、同專案、per-user 文件型；**不寫 `polaris_core`**）；history + subscriptions 共用 |
+> | 2 | 紀錄深度 | **B 級完整還原**：每筆 session 存整包 `result`，點開直接還原當時答案 |
+> | — | 時程 | **測試期就接、Demo 用登入版**；無 token 匿名僅作 CI / 斷網降級（非預設） |
+> | — | 金鑰 | client secret / NextAuth secret → Secret Manager；後端只吃 `GOOGLE_CLIENT_ID` |
+
 ---
 
-## 1. 使用者認證（Auth）— Google OAuth + Magic Link
+## 1. 使用者認證（Auth）— Google OAuth ~~+ Magic Link~~（Magic Link 已砍）
 
 ### 現況
 
@@ -63,6 +75,9 @@ EMAIL_FROM=noreply@polaris.dev
 
 ## 2. 對話紀錄永久儲存（POST /history）
 
+> ✅ **R2 決議**：儲存後端＝**Firestore**（B 級完整還原，存整包 `result`）；與訂閱清單共用。
+> 不寫 `polaris_core`。端點規格與資料模型見 [`Auth-Firestore_串接指南_R2決議.md`](./Auth-Firestore_串接指南_R2決議.md) §5/§6。
+
 ### 現況
 
 對話紀錄目前使用 `localStorage` 暫存（R7 自行實作的 MVP），使用者換瀏覽器或清快取後紀錄消失。
@@ -101,5 +116,5 @@ GET  /history   → [{ id, query, page, time, tags }]
 
 | # | 項目 | 優先 | 狀態 |
 |---|------|------|------|
-| 1 | Auth 架構決策（Google OAuth / Magic Link） | 🔴 高 | 等 R2 決策，前端 UI 已就緒 |
-| 2 | 對話紀錄永久儲存方案 | 🟡 中 | localStorage MVP 可用，等 R2 決定升級時機 |
+| 1 | Auth 架構決策（Google OAuth；Magic Link 砍） | 🔴 高 | ✅ 已決議（NextAuth + Google OAuth）→ R7 接線 |
+| 2 | 對話紀錄永久儲存方案 | 🟡 中 | ✅ 已決議（Firestore, B 級）→ R3 接端點 + R7 切換 |
