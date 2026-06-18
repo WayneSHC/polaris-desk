@@ -156,6 +156,14 @@ renderResult(full.result);   // full.result 就是當初存的整包
 
 ## 4. 後端（R2 / R3）
 
+> ✅ **後端已實作（R2，token-free TDD）**：JWT 驗證、Firestore store、`/history`(POST/GET/GET{id})
+> 與 `/subscriptions`(GET/POST) 都已進 `src/polaris/`，端點契約即 §5。R7 可直接照 §3 串接。
+> - `src/polaris/auth.py`：`current_user`（可選；無 token→匿名）
+> - `src/polaris/user_store.py`：`UserStore`（Firestore，注入式 client seam）
+> - `src/polaris/api.py`：上述端點（登入必填，匿名→401）
+> - 設定：`GOOGLE_CLIENT_ID`（驗 aud；留空＝全程匿名）
+> - **剩真人做的**：GCP Console 建 OAuth Client、runtime SA 加 `roles/datastore.user`、設 `GOOGLE_CLIENT_ID` + CORS 網域、部署。
+
 ### 4-1. 依賴
 ```
 google-cloud-firestore

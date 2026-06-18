@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # 雲端設成 R7 的 Vercel 網域（POLARIS_CORS_ORIGINS=https://<r7-domain>）。
     cors_origins: str = "http://localhost:3000,http://localhost:8501"
 
+    # 使用者登入（R7-1：Google OAuth + Firestore 活動紀錄）。後端只需 client_id 驗
+    # id_token 的 aud；client secret 留前端（NextAuth）。留空 = 任何 token 都驗不過 →
+    # 全程匿名（token-free CI / 斷網降級照常）。Firestore 認證走 ADC（runtime SA），免金鑰。
+    google_client_id: str = ""
+
 
 # 全域單例 —— 其他模組 `from polaris.config import settings`
 settings = Settings()

@@ -29,6 +29,10 @@ dependencies = [
     # W4 thin API：後端 HTTP 入口（Cloud Run + R7 Vercel 對接；純 Python、無 torch）
     "fastapi>=0.115",
     "uvicorn>=0.30",
+    # R7-1 使用者登入 + 活動紀錄：驗 Google id_token + Firestore 存 per-user 紀錄/訂閱
+    # （皆延遲 import；CI 注入 fake → token-free，不連 GCP）
+    "google-auth>=2.30",
+    "google-cloud-firestore>=2.16",
 ]
 
 [project.optional-dependencies]

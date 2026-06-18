@@ -35,11 +35,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
+from polaris.auth import current_user
 from polaris.config import settings
 from polaris.graph.deep_research.agent import run_deep_research
 from polaris.graph.deep_research.state import ReActStep
@@ -55,6 +56,7 @@ from polaris.notifications import (
 )
 from polaris.server import health_payload, resolve_port
 from polaris.structured_store import StructuredStore
+from polaris.user_store import UserStore
 
 _WATCHDOG_MOCK_EVENTS = (
     Path(__file__).resolve().parent / "graph" / "watchdog" / "data" / "watchdog_events.json"
@@ -346,6 +348,85 @@ def events(
     """事件流（events），時間倒序，可依 ticker / type 過濾。做公司動態時間軸用。"""
     rows = _structured_store.list_events(ticker=ticker, event_type=type, limit=limit)
     return [EventResponse(**row) for row in rows]
+
+
+# --- 使用者活動紀錄 + 訂閱（R7-1：Google OAuth 登入後；Firestore）---------------
+#
+# 需登入（Bearer Google id_token）：匿名（無 token）一律 401——個人資料不對匿名開放。
+# 匿名降級走前端 localStorage（保斷網備援），不打這些端點。UserStore 同樣用注入式
+# client seam（lazy Firestore，CI 不連 GCP）。詳見
+# docs/cross-role-collab/Auth-Firestore_串接指南_R2決議.md。
+
+_user_store = UserStore(settings)
+
+
+def _require_uid(user: dict | None) -> str:
+    """登入 → 回 Google sub（使用者主鍵）；匿名 → 401。"""
+    if not user or not user.get("sub"):
+        raise HTTPException(status_code=401, detail="需要登入")
+    return user["sub"]
+
+
+class HistoryIn(BaseModel):
+    """一筆活動紀錄（B 級：``result`` 存整包 → 日後完整還原）。"""
+
+    origin: str = Field(description='來源頁面："research" | "peer"')
+    query: str = Field(min_length=1, description="使用者查詢文字")
+    tickers: list[str] = Field(default_factory=list, description="涉及股票代號")
+    result: dict | None = Field(default=None, description="整包回應，供完整還原（B 級）")
+
+    _not_blank = field_validator("query")(_reject_blank)
+
+
+class HistoryRecordResponse(BaseModel):
+    record_id: str
+    status: str
+
+
+class SubsIn(BaseModel):
+    tickers: list[str] = Field(default_factory=list, description="訂閱股票代號清單")
+
+
+class SubsResponse(BaseModel):
+    status: str
+    tickers: list[str]
+
+
+@app.post("/history", response_model=HistoryRecordResponse, tags=["user"])
+def post_history(body: HistoryIn, user=Depends(current_user)) -> HistoryRecordResponse:
+    """存一筆活動紀錄到登入使用者的 Firestore session 集合。"""
+    rid = _user_store.save_session(_require_uid(user), body.model_dump())
+    return HistoryRecordResponse(record_id=rid, status="ok")
+
+
+@app.get("/history", tags=["user"])
+def get_history(user=Depends(current_user)) -> list[dict]:
+    """登入使用者的活動紀錄清單（created_at 倒序）。"""
+    return _user_store.list_sessions(_require_uid(user))
+
+
+@app.get("/history/{session_id}", tags=["user"])
+def get_history_one(session_id: str, user=Depends(current_user)) -> dict:
+    """單筆紀錄（含整包 ``result``）供前端完整還原；查無 → 404。"""
+    s = _user_store.get_session(_require_uid(user), session_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail="查無此紀錄")
+    return s
+
+
+@app.get("/subscriptions", response_model=SubsResponse, tags=["user"])
+def get_subscriptions(user=Depends(current_user)) -> SubsResponse:
+    """登入使用者的訂閱清單。"""
+    uid = _require_uid(user)
+    return SubsResponse(status="ok", tickers=_user_store.get_subs(uid))
+
+
+@app.post("/subscriptions", response_model=SubsResponse, tags=["user"])
+def post_subscriptions(body: SubsIn, user=Depends(current_user)) -> SubsResponse:
+    """覆蓋登入使用者的訂閱清單。"""
+    uid = _require_uid(user)
+    _user_store.set_subs(uid, body.tickers)
+    return SubsResponse(status="ok", tickers=body.tickers)
 
 
 def main() -> None:  # pragma: no cover - 進入點，由 `python -m polaris.api` 啟動
