@@ -26,7 +26,7 @@ import { api } from "@/lib/api";
 import { API_BASE } from "@/lib/config";
 import { toast } from "sonner";
 
-const PHASES =["理解查詢意圖","檢索文件庫","重排序候選","計算 + 交叉驗證","生成摘要","合規檢查"];
+const PHASES = ["理解查詢意圖","檢索文件庫","重排序候選","計算 + 交叉驗證","生成摘要","合規檢查"];
 const PRESETS = ["台積電 2026Q1 法說會營運重點","聯發科 AI 邊緣運算佈局","台股半導體庫存週期"];
 
 // Client-side mock: cross-check KPI values against summary text for discrepancies.
