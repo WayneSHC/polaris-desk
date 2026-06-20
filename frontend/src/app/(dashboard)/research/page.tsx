@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { mutate } from "swr";
 import { Icon } from "@/components/ui/Icon";
@@ -94,7 +94,7 @@ function Chart({ data }: { data: Array<{label:string;value:number}> }) {
   );
 }
 
-export default function ResearchPage() {
+function ResearchPageInner() {
   const { trigger, data, isMutating } = useResearch();
   const { data: alerts } = useAlerts();
   const rs = useReadStore();
@@ -496,5 +496,14 @@ export default function ResearchPage() {
       )}
       <DocViewer doc={openDoc} onClose={()=>setOpenDoc(null)}/>
     </>
+  );
+}
+
+// useSearchParams() 需包在 Suspense 內，否則 next build 靜態匯出 /research 會 bail-out。
+export default function ResearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResearchPageInner />
+    </Suspense>
   );
 }

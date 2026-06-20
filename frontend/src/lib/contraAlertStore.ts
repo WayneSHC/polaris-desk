@@ -27,6 +27,6 @@ export const contraAlertStore = {
   clear: () => write([]),
   subscribe: (fn: Listener) => {
     listeners.add(fn);
-    return () => listeners.delete(fn);
+    return () => { listeners.delete(fn); };
   },
 };
