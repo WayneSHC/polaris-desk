@@ -1,0 +1,25 @@
+# 重大資訊排程 — Cloud Run Job 容器
+# base image 已含 Chromium + 系統相依（Playwright 官方 python image）
+FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VECTOR_BACKEND=bigquery \
+    BQ_DATASET=polaris_core \
+    DEV_DATASET="" \
+    MAJOR_NEWS_WINDOW_DAYS=3
+
+WORKDIR /app
+
+# 先裝相依（利用 layer cache）
+COPY pyproject.toml ./
+COPY src/ ./src/
+RUN pip install --upgrade pip && pip install -e .
+
+# 確保 Playwright 瀏覽器就緒（base image 已內建，保險起見）
+RUN python -m playwright install chromium
+
+COPY scripts/ ./scripts/
+
+# Cloud Run Job 執行一次即退出
+ENTRYPOINT ["python", "scripts/cron_major_news_core.py"]
