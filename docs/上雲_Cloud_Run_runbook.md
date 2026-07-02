@@ -215,6 +215,45 @@ gcloud run services update polaris-api --region $REGION \
 
 `--max-instances` 封住並行 instance 數 → 封住花費上界；另設 GCP 預算告警（R4 SOP §3.5）。
 
+### 8.4 輸入端守門分階段上線（防止使用者亂問）
+
+輸入端 defense-in-depth，四層各自獨立 flag、**全預設 off**（行為零變動，同 `VISION_EXTRACTION` 慣例）。
+與輸出端 compliance 對稱：確定性 floor 先跑、LLM smart 後跑、攔截零改寫（固定訊息）。
+
+| 層 | flag | 風險 | 說明 |
+|---|---|---|---|
+| L1 注入 | `INPUT_GATE_INJECTION` | 零誤判 | 確定性 prompt-injection / jailbreak 攔截，命中即擋不諮詢 LLM |
+| L3 查無資料 | `INPUT_GATE_NO_EVIDENCE` | 零誤判 | 檢索+計算後 contexts 仍空 → 回固定訊息、不讓 writer 生成（防幻覺） |
+| L2 範圍 | `INPUT_GATE_SCOPE` | 需先驗 | floor 正向放行（ticker/關鍵字）+ Gemini Flash 分類離題；LLM 掛時 fail-open |
+| L0 配額 | `DAILY_QUESTION_QUOTA` | 需流量 | 每人每日題數；登入 keyed on sub、匿名 keyed on IP；只在 `APP_ENV=cloud` 生效 |
+
+**⚠️ 一律用 `--update-env-vars`（增量合併），別用 `--set-env-vars`**（整組覆蓋會清掉線上既有
+`APP_ENV`/`VECTOR_BACKEND`/`GEMINI_USE_VERTEX`/`CORS` 等變數，見 §5 的整組覆蓋警告）。
+
+**Step 1 — 先開零誤判的 L1 + L3（可立即上線）：**
+```bash
+gcloud run services update polaris-api --region $REGION \
+  --update-env-vars "INPUT_GATE_INJECTION=1,INPUT_GATE_NO_EVIDENCE=1"
+```
+
+**Step 2 — 開 L2 範圍層前，先驗 false-block（避免 LLM 誤擋真問題）：**
+```bash
+# 在有 GEMINI_API_KEY 的環境跑；對 eval questions_v1（142 題正當投研題）量誤擋率
+GEMINI_API_KEY=<key> python scripts/scope_gate_check.py
+# 誤擋率接近 0 才開；偏高 → 擴 input_gate._SCOPE_KEYWORDS 或調 SCOPE_SYSTEM_PROMPT
+gcloud run services update polaris-api --region $REGION \
+  --update-env-vars "INPUT_GATE_SCOPE=1"
+```
+
+**Step 3 — 觀察真實流量後再設每日配額（數字別用猜的）：**
+```bash
+# 看 p95 questions/user/day，設 ~3–5×；0=關
+gcloud run services update polaris-api --region $REGION \
+  --update-env-vars "DAILY_QUESTION_QUOTA=50"
+```
+
+> 回滾：把對應 flag `--update-env-vars "INPUT_GATE_SCOPE=0"` 即可，逐層獨立、互不影響。
+
 ---
 
 ### 安全備註
