@@ -25,19 +25,26 @@ GOLD = (
 
 # ── 假 retriever（注入；SearchResult.id == chunk_id）─────────────────────────
 class FakeRetriever:
-    """依 chunk_id→排名 腳本回結果，pre/post 可不同以測 rerank_delta。"""
+    """依 chunk_id→排名 腳本回結果，pre/post 可不同以測 rerank_delta。
 
-    def __init__(self, pre: list[str], post: list[str]):
-        self._pre, self._post = pre, post
+    ``retrieve()`` 預設把結果標成 rerank 已跑（``origin=="rerank"``，模擬 Cohere 成功）；
+    ``rerank_ran=False`` 則保留 bm25 origin，模擬 429/降級 → harness 應報 rerank_delta=None。
+    """
 
-    def _mk(self, ids):
-        return [SearchResult(id=c, content="x", score=1.0 - i * 0.01) for i, c in enumerate(ids)]
+    def __init__(self, pre: list[str], post: list[str], rerank_ran: bool = True):
+        self._pre, self._post, self._rerank_ran = pre, post, rerank_ran
+
+    def _mk(self, ids, origin):
+        return [
+            SearchResult(id=c, content="x", score=1.0 - i * 0.01, metadata={"origin": origin})
+            for i, c in enumerate(ids)
+        ]
 
     def retrieve_candidates(self, query, *, filters=None, top_k=None):
-        return self._mk(self._pre[: (top_k or len(self._pre))])
+        return self._mk(self._pre[: (top_k or len(self._pre))], "bm25")
 
     def retrieve(self, query, *, filters=None):
-        return self._mk(self._post)
+        return self._mk(self._post, "rerank" if self._rerank_ran else "bm25")
 
 
 def gold(**kw) -> GoldItem:
@@ -125,15 +132,45 @@ class TestRetrieval:
         rec = score_retrieval(g, r)
         assert rec.recall_post[10] == 0.0
         assert rec.mrr_post == 0.0
-        assert rec.rerank_delta == 0          # 兩側皆沒中 → 不編故事
+        assert rec.rerank_delta is None       # 兩側皆沒中 → N/A，不編故事
+
+    def test_rerank_ran_detected_from_origin(self):
+        g = gold()
+        gid = g.must_cite_chunk_id[0]
+        rec = score_retrieval(g, FakeRetriever(pre=[gid], post=[gid]))
+        assert rec.rerank_ran is True
+
+    def test_rerank_delta_na_when_rerank_did_not_run(self):
+        """429/降級：post 未帶 rerank origin → rerank_ran False、delta=None（即使排名有變）。"""
+        g = gold()
+        gid = g.must_cite_chunk_id[0]
+        # pre gold 在第 3、post 在第 1；但 rerank 沒真的跑 → 不得謊報 +2。
+        r = FakeRetriever(pre=["a", "b", gid], post=[gid, "a", "b"], rerank_ran=False)
+        rec = score_retrieval(g, r)
+        assert rec.rerank_ran is False
+        assert rec.rerank_delta is None
+
+    def test_summarize_excludes_absent_rerank_from_delta(self):
+        g = gold()
+        gid = g.must_cite_chunk_id[0]
+        ran = score_retrieval(g, FakeRetriever(pre=["a", gid], post=[gid, "a"]))       # delta=+1
+        absent = score_retrieval(g, FakeRetriever(pre=["a", gid], post=[gid, "a"], rerank_ran=False))
+        s = summarize([ran, absent])
+        assert s.n_rerank_ran == 1            # 只有真的跑 rerank 的那題入分母
+        assert s.rerank_improved == 1
 
     def test_no_retriever_is_honest_absence(self):
         rec = score_retrieval(gold(), None)
         assert rec.retriever_available is False
         assert rec.recall_post == {}
 
-    def test_run_retrieval_none_active_in_ci(self):
-        """CI 無金鑰：active_retriever() 為 None → 全題誠實缺席。"""
+    def test_run_retrieval_none_active_in_ci(self, monkeypatch):
+        """無 active_retriever（CI/無金鑰）→ 全題誠實缺席。
+
+        強制 active_retriever()→None（別依賴環境剛好沒 ADC/金鑰——有 creds 的機器上
+        它會真的建 retriever，測試就漂）。
+        """
+        monkeypatch.setattr("polaris.retrieval.retriever.active_retriever", lambda: None)
         items = load_gold_set(GOLD)[:3]
         recs = run_retrieval(items)          # retriever=None → active_retriever()
         assert all(not r.retriever_available for r in recs)
@@ -257,13 +294,15 @@ class TestGenTaxonomy:
 
 # ── 報告 ─────────────────────────────────────────────────────────────────────
 class TestReport:
-    def test_absence_note_when_no_retriever(self):
+    def test_absence_note_when_no_retriever(self, monkeypatch):
+        monkeypatch.setattr("polaris.retrieval.retriever.active_retriever", lambda: None)
         items = load_gold_set(GOLD)[:3]
-        recs = run_retrieval(items)          # CI → 缺席
+        recs = run_retrieval(items)          # 缺席
         md = render_gold_markdown(items, recs)
         assert "檢索缺席" in md
 
-    def test_snapshot_drift_warning(self):
+    def test_snapshot_drift_warning(self, monkeypatch):
+        monkeypatch.setattr("polaris.retrieval.retriever.active_retriever", lambda: None)
         items = load_gold_set(GOLD)[:1]
         recs = run_retrieval(items)
         md = render_gold_markdown(items, recs, live_corpus_rows=99999)

@@ -30,13 +30,17 @@ def main(argv: list[str] | None = None) -> int:
         "--corpus-rows", type=int, metavar="N", default=None,
         help="現況 v_chunk_semantic 全量 row 數；提供才做快照漂移守門（別用 BM25 工作集長度）",
     )
+    parser.add_argument(
+        "--pace-seconds", type=float, metavar="S", default=0.0,
+        help="題間停頓秒數（Cohere Trial key 限 10/min，設 ~7 讓整批都真的過 rerank；預設 0）",
+    )
     args = parser.parse_args(argv)
 
     items = load_gold_set(args.gold)
     if args.quick:
         items = items[: args.quick]
 
-    retrieval = run_retrieval(items, company_filter=args.company_filter)
+    retrieval = run_retrieval(items, company_filter=args.company_filter, pace_seconds=args.pace_seconds)
     mode = "帶 company filter（pipeline 實況）" if args.company_filter else "無 filter（原始檢索鑑別力）"
 
     scores = None

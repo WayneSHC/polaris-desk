@@ -46,15 +46,25 @@ def render_gold_markdown(
     else:
         lines += ["## 檢索分（token=0；只計 answerable=Y 且有 gold）", ""]
         lines.append(f"- 計分題數：{s.n_scored}（缺席 {s.n_skipped_unavailable}）")
-        lines.append("- hit@k (post-rerank)：" + "、".join(f"@{k} {s.hit_post[k]:.0%}" for k in ks))
+        # 主指標：pre-rerank recall/hit——免費、確定性、不碰 Cohere，n 小也穩。
         lines.append(
-            "- recall@k：" + "、".join(
-                f"@{k} pre {s.recall_pre[k]:.2f}→post {s.recall_post[k]:.2f}" for k in ks
-            )
+            "- **recall@k（主指標，rerank 前）**："
+            + "、".join(f"@{k} {s.recall_pre[k]:.2f}" for k in ks)
         )
+        lines.append("- hit@k (post-rerank)：" + "、".join(f"@{k} {s.hit_post[k]:.0%}" for k in ks))
         lines.append(f"- MRR (post)：{s.mrr_post:.3f}")
-        verdict = "值得" if s.rerank_improved > s.rerank_hurt else ("有害" if s.rerank_hurt > s.rerank_improved else "中性")
-        lines.append(f"- rerank 影響：推前 {s.rerank_improved} 題 / 埋掉 {s.rerank_hurt} 題 → **{verdict}**")
+        # rerank 為 best-effort：沒真的跑（降級/缺 key/429）就報 N/A，不偽裝成「中性」。
+        if s.n_rerank_ran == 0:
+            lines.append(
+                "- rerank 影響：**N/A**（本 run rerank 未真的執行——Cohere 降級/缺 key/429；"
+                "post==pre，rerank_delta 不採計）"
+            )
+        else:
+            verdict = "值得" if s.rerank_improved > s.rerank_hurt else ("有害" if s.rerank_hurt > s.rerank_improved else "中性")
+            lines.append(
+                f"- rerank 影響（best-effort，n={s.n_rerank_ran}，小樣本僅方向性）："
+                f"推前 {s.rerank_improved} 題 / 埋掉 {s.rerank_hurt} 題 → **{verdict}**"
+            )
         lines.append("")
 
     # answerable 拆分（避免用語料覆蓋率冒充系統品質）。
