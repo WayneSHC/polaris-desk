@@ -4,11 +4,24 @@ from types import SimpleNamespace
 
 from polaris.eval.dataset import EvalItem
 from polaris.eval.runner import (
+    EvalRecord,
     normalize_contexts,
     read_records_jsonl,
     run_dataset,
     write_records_jsonl,
 )
+
+
+class EmptyContextApp:
+    """真實 workflow 對誠實邊界題合法回空 contexts，但仍是真跑而非 stub。"""
+
+    def invoke(self, payload):
+        return {
+            "answer": "資料不足",
+            "contexts": [],
+            "citations": [],
+            "compliance_status": "passed",
+        }
 
 
 class FakeApp:
@@ -92,3 +105,24 @@ def test_records_jsonl_round_trip(tmp_path):
     restored = read_records_jsonl(path)
 
     assert restored[0].to_dict() == records[0].to_dict()
+
+
+def test_legit_empty_contexts_from_real_workflow_is_not_smoke():
+    records = run_dataset([make_item("Q1")], app=EmptyContextApp())
+
+    assert records[0].contexts == []
+    assert records[0].is_stub is False
+    assert records[0].is_smoke_test is False
+
+
+def test_from_dict_tolerates_added_and_removed_fields():
+    record = run_dataset([make_item("Q1")], app=FakeApp())[0]
+    data = record.to_dict()
+    data["future_field_added_later"] = "ignore me"
+    del data["context_source"]
+
+    restored = EvalRecord.from_dict(data)
+
+    assert restored.item.item_id == "Q1"
+    assert restored.context_source == "unknown"
+    assert not hasattr(restored, "future_field_added_later")

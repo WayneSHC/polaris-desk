@@ -88,6 +88,112 @@ def test_empty_contexts_are_unscorable_and_not_sent_to_ragas():
     assert "unscorable_empty_contexts" in report.scores[0].failed_reasons
 
 
+SAFE_ANSWER = "本系統不提供買賣建議，僅描述事實與引用來源。"
+
+
+def make_special_record(
+    *,
+    category: str,
+    redteam: bool,
+    answer: str,
+    contexts: list[str],
+    citations: list[dict] | None = None,
+) -> EvalRecord:
+    item = EvalItem(
+        item_id="Q1",
+        scenario="1",
+        question="question",
+        golden_answer="ground truth",
+        category=category,
+        redteam=redteam,
+    )
+    return EvalRecord(
+        item=item,
+        answer=answer,
+        contexts=contexts,
+        ground_truth=item.golden_answer,
+        citations=[] if citations is None else citations,
+        compliance_status="passed",
+        context_source="unknown",
+    )
+
+
+def test_redteam_empty_contexts_not_penalized_by_ragas_in_flash():
+    record = make_special_record(
+        category="紅隊", redteam=True, answer=SAFE_ANSWER, contexts=[]
+    )
+
+    report = score_records(
+        [record], mode="flash", ragas_evaluator=lambda records: []
+    )
+
+    score = report.scores[0]
+    assert score.scorable is True
+    assert "unscorable_empty_contexts" not in score.failed_reasons
+    assert not any(reason.startswith(tuple(RAGAS_THRESHOLDS)) for reason in score.failed_reasons)
+    assert score.passed is True
+
+
+def test_honest_boundary_empty_contexts_not_penalized_by_ragas_in_flash():
+    record = make_special_record(
+        category="誠實邊界",
+        redteam=False,
+        answer="2023Q4 資料不足，無法回答。",
+        contexts=[],
+    )
+
+    report = score_records(
+        [record], mode="flash", ragas_evaluator=lambda records: []
+    )
+
+    score = report.scores[0]
+    assert score.scorable is True
+    assert "unscorable_empty_contexts" not in score.failed_reasons
+    assert score.passed is True
+
+
+def test_redteam_empty_contexts_pass_in_gate_when_judges_pass(monkeypatch):
+    record = make_special_record(
+        category="紅隊", redteam=True, answer=SAFE_ANSWER, contexts=[]
+    )
+    monkeypatch.setattr(
+        "polaris.eval.score.judge_records",
+        lambda records, clients=None: {
+            "Q1": [
+                JudgeVote("gemini", "g", True, "ok"),
+                JudgeVote("openai", "o", True, "ok"),
+                JudgeVote("anthropic", "a", True, "ok"),
+            ]
+        },
+    )
+
+    report = score_records(
+        [record],
+        mode="gate",
+        ragas_evaluator=lambda records: [],
+        judge_clients={},
+    )
+
+    score = report.scores[0]
+    assert "unscorable_empty_contexts" not in score.failed_reasons
+    assert score.passed is True
+
+
+def test_general_empty_contexts_still_unscorable_after_fix():
+    record = make_special_record(
+        category="財務基本", redteam=False, answer="有內容", contexts=[]
+    )
+
+    report = score_records(
+        [record], mode="flash", ragas_evaluator=lambda records: []
+    )
+
+    score = report.scores[0]
+    assert score.scorable is False
+    assert "unscorable_empty_contexts" in score.failed_reasons
+    assert score.passed is False
+
+
 def test_gate_requires_two_of_three_judges(monkeypatch):
     votes = [
         JudgeVote("gemini", "g", True, "ok"),
