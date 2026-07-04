@@ -72,11 +72,14 @@ class TestGoldLoader:
         multi = next(i for i in load_gold_set(GOLD) if len(i.must_cite_chunk_id) > 1)
         assert all(c for c in multi.must_cite_chunk_id)
 
-    def test_answerable_gap_marked(self):
-        """華碩(2357) EPS 文字語料查無 → answerable='?'、無 gold chunk。"""
+    def test_structured_metric_source_accepted(self):
+        """華碩(2357) EPS：原誤標語料缺口(?)，實為可答——financial_metrics 有 eps=13.19，
+        且 presentation chunk 2357-2026Q1-p005-c001 佐證(13.2)。已更正為 Y，must_cite 以
+        finmind 結構源為主(帶精確值)+ presentation 佐證。"""
         asus = next(i for i in load_gold_set(GOLD) if "2357" in i.question)
-        assert asus.answerable == "?"
-        assert asus.must_cite_chunk_id == ()
+        assert asus.answerable == "Y"
+        assert "2357_2026-03-31_finmind_fs" in asus.must_cite_chunk_id
+        assert "2357-2026Q1-p005-c001" in asus.must_cite_chunk_id
 
     def test_company_ticker_parsed(self):
         tsmc = next(i for i in load_gold_set(GOLD) if i.item_id == "E005")
