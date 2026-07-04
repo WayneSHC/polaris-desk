@@ -232,7 +232,12 @@ def _metric_context(ticker: str, quarter: str, row: dict[str, Any], *, extra: st
 
 
 #: calculator 真路徑抓的 metric_id（gross_margin 非入庫指標，由 gross_profit / revenue 推導）。
-_CALC_METRIC_IDS = ("revenue", "revenue_yoy", "gross_profit")
+#: eps / net_income 一併餵進 contexts——presentation chunk 常把 EPS 切成獨立子塊而檢索
+#: 不到（E013 日月光根因），這條結構化後路確保數字題有可引用的接地來源。
+_CALC_METRIC_IDS = ("revenue", "revenue_yoy", "gross_profit", "eps", "net_income")
+
+#: 直接入 contexts 的原生指標（有值就餵，不做推導）；revenue 已由專屬分支處理。
+_PASSTHROUGH_METRIC_IDS = ("eps", "net_income")
 
 
 def _structured_calculations(
@@ -294,6 +299,15 @@ def _structured_calculations(
                         extra=f"以同季營收推導毛利率 = {margin}%（gross_profit / revenue × 100）",
                     )
                 )
+            # eps / net_income 原生指標：有值就直接餵進 contexts（數字必有來源）。
+            for mid in _PASSTHROUGH_METRIC_IDS:
+                row = rows.get(mid)
+                if row and row.get("value") is not None:
+                    entry[mid] = {
+                        "value": row["value"], "unit": row.get("unit"),
+                        "source_id": row.get("source_id"),
+                    }
+                    extra_contexts.append(_metric_context(ticker, quarter, row))
             if entry:
                 calcs[f"{ticker}:{quarter}"] = entry
     if not calcs:
