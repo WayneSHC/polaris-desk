@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     scores = None
     if not args.no_generation:
         rmap = {rec.item_id: rec for rec in retrieval}
-        scores = run_generation(items, rmap)
+        scores = run_generation(items, rmap, pace_seconds=args.pace_seconds)
 
     # 快照漂移守門只在明確提供 --corpus-rows 時做（BM25 工作集只含最新 2 期，
     # 拿它冒充 v_chunk_semantic 全量會誤報，故不自動填）。

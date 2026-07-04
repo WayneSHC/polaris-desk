@@ -127,10 +127,22 @@ def run_generation(
     retrieval_by_id: dict[str, RetrievalRecord] | None = None,
     *,
     run_fn=_default_run_fn,
+    pace_seconds: float = 0.0,
 ) -> list[GoldScore]:
-    """批次生成評測。``retrieval_by_id`` 供失敗分類分辨 retrieval_miss vs wrong_number。"""
+    """批次生成評測。``retrieval_by_id`` 供失敗分類分辨 retrieval_miss vs wrong_number。
+
+    ``pace_seconds``：題間停頓秒數（預設 0）。每題跑整條 workflow（內含 Cohere rerank +
+    Gemini 生成），Trial key / Vertex QPM 連打會限流；設 ~7 讓真跑更穩。
+    """
     rmap = retrieval_by_id or {}
-    return [score_item(it, run_fn(it), rmap.get(it.item_id)) for it in items]
+    scores: list[GoldScore] = []
+    for i, it in enumerate(items):
+        if pace_seconds and i:
+            import time
+
+            time.sleep(pace_seconds)
+        scores.append(score_item(it, run_fn(it), rmap.get(it.item_id)))
+    return scores
 
 
 def taxonomy(scores: list[GoldScore]) -> dict[str, list[str]]:

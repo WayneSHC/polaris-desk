@@ -291,6 +291,13 @@ class TestGenTaxonomy:
         tax = taxonomy(scores)
         assert sum(len(v) for v in tax.values()) == 2
 
+    def test_run_generation_pace_zero_does_not_sleep(self, monkeypatch):
+        """pace_seconds=0（預設）→ 不 sleep（不拖慢 CI/測試）。"""
+        called = {"sleep": 0}
+        monkeypatch.setattr("time.sleep", lambda s: called.__setitem__("sleep", called["sleep"] + 1))
+        run_generation(load_gold_set(GOLD)[:2], run_fn=lambda it: GenResult(answer="x"))
+        assert called["sleep"] == 0
+
 
 # ── 報告 ─────────────────────────────────────────────────────────────────────
 class TestReport:
