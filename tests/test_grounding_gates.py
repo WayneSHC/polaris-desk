@@ -109,3 +109,54 @@ class TestNumbersGrounded:
 
     def test_empty_evidence_no_numbers_returns_true(self):
         assert st.numbers_grounded("無數字", []) is True
+
+
+# ---------------------------------------------------------------------------
+# numbers_grounded_in_text — text-vs-text gate (P1 peer-compare)
+# ---------------------------------------------------------------------------
+
+
+class TestNumbersGroundedInText:
+    BASE = "台積電毛利率 58.8%，聯電毛利率 47.9%（來源：s1）"
+
+    def test_direct_subset_passes(self):
+        assert st.numbers_grounded_in_text("台積電 58.8%（來源：s1）", self.BASE) is True
+
+    def test_no_numbers_passes(self):
+        assert st.numbers_grounded_in_text("兩家表現分歧（來源：s1）", self.BASE) is True
+
+    def test_derived_number_blocked_by_default(self):
+        # #56：預設嚴格子集 —— 派生數字 10.9 不在 base → 擋（backward-compat）。
+        prose = "台積電毛利率高出 10.9 個百分點（來源：s1）"
+        assert st.numbers_grounded_in_text(prose, self.BASE) is False
+
+    # --- allow_arithmetic (#56 Option A) ---
+
+    def test_correct_difference_allowed(self):
+        # 58.8 − 47.9 = 10.9，重算相等 → 放行。
+        prose = "台積電毛利率高出 10.9 個百分點（來源：s1）"
+        assert st.numbers_grounded_in_text(prose, self.BASE, allow_arithmetic=True) is True
+
+    def test_correct_sum_allowed(self):
+        base = "A 為 30，B 為 12（來源：s1）"
+        assert st.numbers_grounded_in_text("兩者合計 42（來源：s1）", base, allow_arithmetic=True) is True
+
+    def test_wrong_arithmetic_blocked(self):
+        # Flash 算錯：58.8 − 47.9 = 10.9，但寫成 10.8 → 精確不等 → 擋。
+        prose = "台積電毛利率高出 10.8 個百分點（來源：s1）"
+        assert st.numbers_grounded_in_text(prose, self.BASE, allow_arithmetic=True) is False
+
+    def test_non_base_number_blocked_even_with_arithmetic(self):
+        # 999 既不在 base、也非任兩 base 數字的 ± → 擋。
+        prose = "神秘目標 999（來源：s1）"
+        assert st.numbers_grounded_in_text(prose, self.BASE, allow_arithmetic=True) is False
+
+    def test_multiplication_not_allowed(self):
+        # 乘除不放行：3 × 4 = 12 不得過閘（只允許 ±）。
+        base = "數量 3，單位 4（來源：s1）"
+        assert st.numbers_grounded_in_text("推導 12（來源：s1）", base, allow_arithmetic=True) is False
+
+    def test_single_base_number_not_self_derivable(self):
+        # 只有一個 base 數字時，不得靠自己湊出派生數字（需兩個相異 base 數字）。
+        base = "唯一數字 50（來源：s1）"
+        assert st.numbers_grounded_in_text("推導 100（來源：s1）", base, allow_arithmetic=True) is False

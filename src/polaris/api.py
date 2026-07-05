@@ -1155,8 +1155,10 @@ def _peer_synthesis(base: str, *, client) -> tuple[str, str]:
     # Gate 1: prose must contain at least one source tag (來源：...).
     # Gate 2: every number in prose must come from the deterministic base
     # (防幻覺數字；憲法 §II「每個數字都要有來源」)。base 已是接地的數字來源。
+    # #56 Option A：放行「經驗證的接地算術」——比較敘事的派生數字（如「高出 X 個
+    # 百分點」）若恰等於兩個 base 數字的 ±（重算精確相等）亦視為接地，提高 P1 採用率。
     if not _re.search(r"[（(]來源[：:][^）)]+[）)]", prose) or not numbers_grounded_in_text(
-        prose, base
+        prose, base, allow_arithmetic=True
     ):
         _log.info("peer_synthesis outcome=%s", PEER_OUTCOME_GATE_FAILED)
         return base, PEER_OUTCOME_GATE_FAILED

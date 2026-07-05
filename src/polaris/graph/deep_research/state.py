@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -84,16 +85,63 @@ def _extract_numbers(text: str) -> set[str]:
     return set(_NUMBER_RE.findall(_SOURCE_TAG.sub("", text)))
 
 
-def numbers_grounded_in_text(prose: str, source: str) -> bool:
+def _to_decimal(token: str) -> Decimal | None:
+    """把數字 token（含全/半形千分位與小數點）轉成 Decimal；無法解析 → None。"""
+    normalized = token.replace(",", "").replace("，", "").replace("．", ".")
+    try:
+        return Decimal(normalized)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _is_derived_by_add_sub(target: Decimal, base_values: Sequence[Decimal]) -> bool:
+    """``target`` 是否恰等於**兩個相異 base 數字**的 ``+`` 或 ``−``（精確相等）。
+
+    #56 Option A：比較敘事天生會算「高出 X 個百分點」這類派生數字。只放行由兩個
+    已接地 base 數字經加/減導出、且**重算完全相等**者——我們不信 LLM 的算術，而是
+    自己重算後才放行（Flash 算錯即精確不等 → 擋）。不放行乘除、3+ 運算元。
+    """
+    n = len(base_values)
+    for i in range(n):
+        for j in range(n):
+            if i == j:  # 需兩個相異位置的 base 數字，不得自己湊自己
+                continue
+            a, b = base_values[i], base_values[j]
+            if a + b == target or a - b == target:
+                return True
+    return False
+
+
+def numbers_grounded_in_text(
+    prose: str, source: str, *, allow_arithmetic: bool = False
+) -> bool:
     """``prose`` 中所有數字是否都出現在 ``source`` 文字中（text-vs-text 接地閘門）。
 
     給「來源就是一段確定性文字」的觸點用（如 peer-compare 的 base 摘要）。
     prose 無數字 → True（無可驗數字）。
+
+    ``allow_arithmetic=True``（#56 Option A）：直接不在 source 的數字，若恰等於
+    **兩個相異 base 數字**的 ``+`` / ``−``（精確相等）亦放行；乘除 / 3+ 運算元不放行。
+    ⚠️ 殘餘風險：base 內兩不相關數字剛好加/減等於某幻覺數 → 巧合放行（本議題明列之取捨）。
     """
     nums_in_prose = _extract_numbers(prose)
     if not nums_in_prose:
         return True
-    return nums_in_prose.issubset(_extract_numbers(source))
+
+    source_tokens = _extract_numbers(source)
+    if nums_in_prose.issubset(source_tokens):
+        return True
+    if not allow_arithmetic:
+        return False
+
+    base_values = [d for d in (_to_decimal(t) for t in source_tokens) if d is not None]
+    for token in nums_in_prose:
+        if token in source_tokens:
+            continue
+        value = _to_decimal(token)
+        if value is None or not _is_derived_by_add_sub(value, base_values):
+            return False
+    return True
 
 
 def numbers_grounded(text: str, evidence: Sequence[Citation]) -> bool:
