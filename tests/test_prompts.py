@@ -18,6 +18,12 @@ class TestSharedFragments:
     def test_grounding_clause_nonempty(self):
         assert p.GROUNDING_CLAUSE.strip()
 
+    def test_grounding_clause_locks_citation_format(self):
+        # #78：GROUNDING_CLAUSE 必須鎖死單一引用格式「（來源：source_id）」，
+        # 否則 writer/react 每次生成隨機挑格式，前端 adapters 對不回 citation。
+        # 對齊 SYNTHESIS/PEER_SYNTHESIS 既有慣例（「（來源：sid）」）。
+        assert "（來源：" in p.GROUNDING_CLAUSE
+
 
 class TestSystemPrompts:
     @pytest.mark.parametrize(

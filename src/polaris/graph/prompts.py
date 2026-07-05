@@ -19,8 +19,12 @@ NO_ADVICE_CLAUSE = (
 )
 
 #: 接地：關鍵數字 / 主張須標來源 source_id，無依據則誠實說資料不足。
+#: #78 — 格式鎖死成單一寫法「（來源：source_id）」（對齊 SYNTHESIS/PEER_SYNTHESIS
+#: 慣例），否則 writer/react 每次生成隨機挑格式，前端 adapters 對不回 citation。
 GROUNDING_CLAUSE = (
-    "每個關鍵數字或主張都要標註對應來源（source_id）；"
+    "每個關鍵數字或主張都要標註對應來源；"
+    "引用格式一律用全形括號「（來源：source_id）」緊接在該主張之後，"
+    "不得使用其他寫法（如 (source_id: …)、(source: …)、方括號 [..]、裸 ID 皆不允許）；"
     "找不到依據就明說資料不足，不得臆測。"
 )
 
