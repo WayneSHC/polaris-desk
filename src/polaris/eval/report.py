@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import os
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
@@ -51,7 +52,9 @@ def build_summary(
     metric_values: dict[str, list[float]] = defaultdict(list)
     for score in report.scores:
         for metric, value in score.ragas.items():
-            if value is not None:
+            # 排除 None（空 contexts）與 nan/inf（judge timeout / RAGAS 放棄該指標）：
+            # 一個 nan 會把 mean 毒成 nan，讓聚合報告嚴重低估真實分數。
+            if value is not None and math.isfinite(value):
                 metric_values[metric].append(value)
 
     redteam_ids = [record.item.item_id for record in records if record.item.redteam]
