@@ -32,7 +32,9 @@ _REQUIRED = {
     "redteam",
 }
 _TRUE_VALUES = {"Y", "YES", "TRUE", "1", "是"}
-_FALSE_VALUES = {"N", "NO", "FALSE", "0", "否", ""}
+# 「是否紅隊」為 _REQUIRED 必填且決定套用哪組合規檢查，空值不可靜默降級成
+# 非紅隊（合規風險），須讓 _parse_bool raise。故意不含 ""。
+_FALSE_VALUES = {"N", "NO", "FALSE", "0", "否"}
 
 
 class EvalItem(BaseModel):

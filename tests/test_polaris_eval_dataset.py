@@ -53,3 +53,15 @@ def test_dataset_rejects_invalid_redteam_value(tmp_path):
 
     with pytest.raises(ValueError, match="是否紅隊值無效"):
         load_dataset(path)
+
+
+def test_dataset_rejects_empty_redteam_value(tmp_path):
+    path = tmp_path / "empty_redteam.csv"
+    path.write_text(
+        "題號,場景,問題,golden_answer,公司,季別,類別,是否紅隊\n"
+        "Q1,1,問題,答案,公司,2025Q1,類別,\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="是否紅隊值無效"):
+        load_dataset(path)

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable
 
@@ -46,7 +46,10 @@ class EvalRecord:
         payload = dict(data)
         payload.pop("context_count", None)
         payload["item"] = EvalItem(**payload["item"])
-        return cls(**payload)
+        # 舊 records.jsonl 於 schema 演進後仍可 --reuse-records 重跑：忽略已移除的
+        # 欄位，缺少的新欄位交由 dataclass 預設值補上。
+        known = {field_def.name for field_def in fields(cls)}
+        return cls(**{key: value for key, value in payload.items() if key in known})
 
 
 def normalize_contexts(raw_contexts: Any) -> list[str]:
@@ -179,7 +182,8 @@ def _record_from_result(item: EvalItem, result: dict[str, Any]) -> EvalRecord:
         escalated=any(citation.get("origin") == "vision" for citation in citations),
         context_source=context_source,
         is_stub=is_stub,
-        is_smoke_test=is_stub or not contexts,
+        # 只反映 workflow 是否用 stub 語料；誠實邊界題合法空 contexts 不等於 smoke。
+        is_smoke_test=is_stub,
     )
 
 
@@ -216,7 +220,9 @@ def _serialize_citation(citation: Any) -> dict[str, Any]:
     if isinstance(citation, dict):
         return dict(citation)
     if hasattr(citation, "model_dump"):
-        return citation.model_dump()
+        # mode="json" 讓 date（Citation.published_at）等非 JSON 原生型別轉成字串，
+        # 否則真檢索帶日期的引用寫 records.jsonl 會 TypeError（stub 假語料不帶日期故從未踩到）。
+        return citation.model_dump(mode="json")
     return {
         "source_id": str(getattr(citation, "source_id", "")),
         "snippet": str(getattr(citation, "snippet", "")),

@@ -46,9 +46,8 @@ eval = [
     # The evaluator below uses the RAGAS 0.2 single-turn API, so keep this
     # compatible LangChain stack together until that implementation migrates.
     "ragas>=0.2,<0.3",
-    "datasets>=3.0",
-    "pandas>=2.2",
-    "matplotlib>=3.9",
+    "datasets>=3.0",  # ragas 0.2.x runtime dep（保留顯式 pin）
+    "pandas>=2.2",  # score.py 透過 ragas 結果的 .to_pandas() 取回逐題分數
     "langchain-community>=0.3,<0.4",
     "langchain-google-genai>=2.0,<3.0",
 ]
