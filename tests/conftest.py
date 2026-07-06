@@ -82,3 +82,40 @@ _SKILL_SCRIPTS = (
 )
 if str(_SKILL_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SKILL_SCRIPTS))
+
+
+# ── Hermetic credentials（讓整套測試不受環境 ambient 金鑰影響）─────────────────
+@pytest.fixture(autouse=True)
+def _hermetic_credentials(request, monkeypatch):
+    """預設把每個測試釘在「無憑證的確定性路徑」，讓整套測試 hermetic。
+
+    根因（2026-07-05 失敗紀錄的 15 紅燈）：``gemini.available()`` 只看
+    ``settings.gemini_api_key`` 有沒有值。CI（無金鑰）→ 走 stub 語料 / DEFAULT_ANCHOR
+    → 全綠；但**開發者本機若有真金鑰 / GCP 憑證**，同一批單元 / E2E 測試改走
+    real-infra 分支（動態 temporal anchor、真實 BM25 corpus、線上 embedding 檢索），
+    於是約 10 個「斷言在 stub / 預設值上」的測試就紅——這正是紀錄裡「到底是我改壞
+    還是 main 本來就壞」反覆排查成本的來源。這批紅燈非邏輯回歸，是測試不 hermetic。
+
+    退場機制：
+    - ``tests/security/*`` 反而**要**在有金鑰時打真 LLM（``@requires_llm`` 守門、
+      收集期就決定 skip 與否），這裡不動它們的金鑰。
+    - 想測「有金鑰」路徑的測試自己 ``monkeypatch`` ``settings.gemini_api_key`` /
+      ``gemini.available``；那些 patch 在此 fixture 之後套用 → 覆蓋掉這裡的清空。
+    """
+    from polaris.config import settings
+    from polaris.graph import temporal
+    from polaris.retrieval import retriever
+
+    # process 級 lru_cache 會跨測試外洩：若某測在有金鑰時填了 2026Q1 / 真實 corpus，
+    # 之後無金鑰的測試會讀到快取的髒值。每測前後清乾淨。
+    temporal._cached_anchor.cache_clear()
+    retriever._cached_real_corpus.cache_clear()
+
+    # security 子樹保留 ambient 金鑰（要打真 LLM 才有意義）。
+    if "security" not in Path(str(request.node.fspath)).parts:
+        monkeypatch.setattr(settings, "gemini_api_key", "", raising=False)
+
+    yield
+
+    temporal._cached_anchor.cache_clear()
+    retriever._cached_real_corpus.cache_clear()
