@@ -191,8 +191,12 @@ gcloud run services update polaris-web --region $REGION \
   --vpc-connector polaris-connector --vpc-egress all-traffic
 # 驗收：公網應打不到後端，瀏覽器走 web /api proxy 仍正常
 API=$(gcloud run services describe polaris-api --region $REGION --format='value(status.url)')
-curl -sS -o /dev/null -w "%{http_code}\n" "$API/health"   # 期望 403/連不上
+curl -sS -o /dev/null -w "%{http_code}\n" "$API/health"   # 期望 404（Google 前端擋下，任何路徑皆同；2026-07-08 實測）
 ```
+
+註：`/healthz` 是 run.app 網域的 GFE 保留路徑——即使經 VPC 內部流量也到不了 app
+（2026-07-08 經 web proxy 實測：`/api/healthz` 回 Google 404、`/api/<其他路徑>` 回
+FastAPI JSON 404）。健康檢查打 run.app URL 時請用 `/health` 等非保留路徑。
 
 ### 8.2 app 層限流（擋「匿名經 web /api/* 代轉」這條缺口）
 

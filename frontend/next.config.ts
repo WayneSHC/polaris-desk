@@ -2,11 +2,18 @@ import type { NextConfig } from "next";
 
 // polaris-api（後端 Cloud Run）base URL。
 // rewrites() 在 server 啟動時（runtime）求值，因此可用 BACKEND_API_URL runtime env
-// 逐次部署覆寫——不像 NEXT_PUBLIC_* 是 build-time baked-in。預設指向已知後端，
-// 讓 frontend 不必重 build 也能切後端。
+// 逐次部署覆寫——不像 NEXT_PUBLIC_* 是 build-time baked-in。
+//
+// polaris-api 已收口 ingress=internal-and-cloud-load-balancing（上雲 runbook §8.1，
+// 2026-07-08 生效）：公網直打它的 run.app URL 一律被 Google 前端擋成 404——不是 URL
+// 失效。production 預設只在 Cloud Run 上的 polaris-web（掛 polaris-connector、
+// egress all-traffic）經 VPC 視為內部流量才通。因此 `next dev` 預設改走本機後端
+// （先 `make serve-api` 起 :8000）；要打其他後端請設 BACKEND_API_URL。
 const BACKEND_API_URL =
   process.env.BACKEND_API_URL ??
-  "https://polaris-api-14326813937.asia-east1.run.app";
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "https://polaris-api-14326813937.asia-east1.run.app");
 
 // 安全性標頭：CSP 作為 XSS 的瀏覽器層防線（後備），並鎖定 clickjacking /
 // MIME sniffing / base-uri 竄改。script/style 仍需 'unsafe-inline'（Next.js 水合

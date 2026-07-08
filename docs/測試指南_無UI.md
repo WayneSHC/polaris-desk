@@ -135,6 +135,26 @@ curl -s localhost:8000/research \
 不想寫 curl：開 `http://localhost:8000/docs`（Swagger UI）逐一點測。
 通知流另有 `http://localhost:8000/demo/notifications` 可看。
 
+### 前端本機開發要接哪個後端　🤖
+
+雲端 `polaris-api` 已收口 `ingress=internal-and-cloud-load-balancing`（上雲 runbook
+§8.1）：**從本機直打它的 run.app URL 一律被 Google 前端擋成 404**——這是刻意設計，
+不是 URL 失效。所以前端本機開發一律先起本地後端：
+
+```bash
+make serve-api                 # 後端起在 :8000
+cd frontend && npm run dev     # next dev 的 /api proxy 預設指向 http://localhost:8000
+```
+
+要打其他後端（例如同事的 dev 環境）就覆寫 runtime env：
+
+```bash
+BACKEND_API_URL=https://<其他後端> npm run dev
+```
+
+雲端部署（`polaris-web`）不用設：production 預設仍是 polaris-api 的 run.app URL，
+經 VPC connector 視為內部流量、通得了。
+
 ---
 
 ## Step 5（選用）—— 雲端管路煙測　🤖
@@ -163,6 +183,7 @@ Step 1–4 全程不需 UI，已涵蓋端到端。
 | BigQuery 權限錯 | 未 `gcloud auth application-default login` | 跑該登入；或改 `VECTOR_BACKEND=pgvector` 走離線 |
 | eval 報告全綠但仍不放心 | 那是**煙測分**非真分 | 裝 `.[eval]` extra + 金鑰跑真 Ragas |
 | `python -m polaris.eval` exit 1 | 某題踩買賣建議紅線 | 看不及格清單題號，回報題庫 owner（R5/R6）|
+| 直接 curl 雲端 polaris-api 的 run.app URL 全路徑 404（Google 404 頁）| ingress 已收 internal（上雲 runbook §8.1），公網本來就打不到 | 非故障。本機開發走「前端本機開發要接哪個後端」；驗雲端請經 `polaris-web` 的 `/api/*` proxy |
 
 ---
 
