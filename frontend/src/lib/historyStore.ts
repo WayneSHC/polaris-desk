@@ -7,6 +7,8 @@ export interface HistoryEntry {
   page: "research" | "peer";
   time: string;
   tags: string[];
+  /** epoch ms，供時間分組；後端紀錄由 created_at 換算，localStorage 紀錄從 id 解析 */
+  ts?: number;
 }
 
 function now(): string {

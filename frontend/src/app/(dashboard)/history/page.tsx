@@ -9,28 +9,19 @@ import { logError } from "@/lib/logger";
 import { PanelSkeleton } from "@/components/polaris/Skeleton";
 import { historyStore } from "@/lib/historyStore";
 import type { HistoryEntry } from "@/lib/historyStore";
+import { getGroup, resolveHistoryClick } from "@/lib/history-nav";
+import type { HistoryGroup } from "@/lib/history-nav";
 
 const FILTER_TABS = ["all", "research", "peer"];
 const TAB_LABELS: Record<string, string> = { all: "全部", research: "研究助理", peer: "同業比較" };
 
 const GROUP_LABELS = { today: "今日", thisWeek: "本週", earlier: "更早" } as const;
-type Group = keyof typeof GROUP_LABELS;
-const GROUP_ORDER: Group[] = ["today", "thisWeek", "earlier"];
-
-function getGroup(id: string): Group {
-  const ts = parseInt(id.replace("hist-", ""), 10);
-  if (isNaN(ts)) return "earlier";
-  const now = new Date();
-  const d = new Date(ts);
-  if (d.toDateString() === now.toDateString()) return "today";
-  if (now.getTime() - ts < 7 * 86400000) return "thisWeek";
-  return "earlier";
-}
+const GROUP_ORDER: HistoryGroup[] = ["today", "thisWeek", "earlier"];
 
 function groupItems(items: HistoryEntry[]) {
-  const buckets: Partial<Record<Group, HistoryEntry[]>> = {};
+  const buckets: Partial<Record<HistoryGroup, HistoryEntry[]>> = {};
   for (const item of items) {
-    const g = getGroup(item.id);
+    const g = getGroup(item);
     (buckets[g] ??= []).push(item);
   }
   return GROUP_ORDER
@@ -62,15 +53,9 @@ export default function HistoryPage() {
   };
 
   const handleItemClick = async (item: HistoryEntry) => {
-    if (session) {
-      const full = await api.historyOne(item.id);
-      if (full?.result) {
-        sessionStorage.setItem("polaris_restore", JSON.stringify({ id: item.id, query: full.query, page: full.page, result: full.result, time: item.time }));
-        router.push(`/${full.page}?historyId=${encodeURIComponent(item.id)}`);
-        return;
-      }
-    }
-    router.push(`/${item.page}?q=${encodeURIComponent(item.query)}`);
+    const nav = await resolveHistoryClick(item, !!session, api.historyOne);
+    if (nav.restore) sessionStorage.setItem("polaris_restore", JSON.stringify(nav.restore));
+    router.push(nav.url);
   };
 
   const filtered = (data ?? []).filter(item => filter === "all" || item.page === filter);

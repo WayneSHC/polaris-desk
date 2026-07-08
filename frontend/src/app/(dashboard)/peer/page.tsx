@@ -482,6 +482,9 @@ function PeerPageInner() {
   const [isListening, setIsListening] = useState(false);
   const [thinkingSec, setThinkingSec] = useState(0);
   const [apiError, setApiError] = useState<string | null>(null);
+  // A 級重跑：從對話紀錄退回 ?q= 進來時暫存查詢，等 companies / fiscalPeriod 載好再跑
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
+  const historyEntryConsumedRef = useRef(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const slotRef = useRef<HTMLDivElement>(null);
@@ -510,28 +513,53 @@ function PeerPageInner() {
     return () => document.removeEventListener("mousedown", handle);
   }, [openSlot]);
 
-  // 從對話紀錄點進來時，讀 sessionStorage 還原比較結果
+  // 從對話紀錄點進來時，讀 sessionStorage 還原比較結果（B 級）；
+  // 還原不成（localStorage 紀錄無整包 result、或刷新後 sessionStorage 已清）
+  // 退回 A 級：帶 ?q= 自動重跑一次查詢，不再停在空白初始頁
   useEffect(() => {
+    // 冪等 guard：restore 分支會消耗掉 sessionStorage，effect 重跑（dev StrictMode）
+    // 時第二次會誤入 q 分支、拿 API 重跑蓋掉剛還原的結果
+    if (historyEntryConsumedRef.current) return;
+    historyEntryConsumedRef.current = true;
     const historyId = searchParams.get("historyId");
-    if (!historyId) return;
-    try {
-      const raw = sessionStorage.getItem("polaris_restore");
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.id !== historyId || saved.page !== "peer") return;
-      const result = saved.result as PeerCompareResult;
-      setQuery(saved.query ?? "");
-      setAId(result.a_ticker ?? "");
-      setBId(result.b_ticker ?? "");
-      if (result.fiscal_period) setFiscalPeriod(result.fiscal_period);
-      setHasQueried(true);
-      setPhase("done");
-      setProgress(100);
-      setPeerResult(result);
-      sessionStorage.removeItem("polaris_restore");
-    } catch {}
+    if (historyId) {
+      try {
+        const raw = sessionStorage.getItem("polaris_restore");
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.id === historyId && saved.page === "peer") {
+            const result = saved.result as PeerCompareResult;
+            setQuery(saved.query ?? "");
+            setAId(result.a_ticker ?? "");
+            setBId(result.b_ticker ?? "");
+            if (result.fiscal_period) setFiscalPeriod(result.fiscal_period);
+            setHasQueried(true);
+            setPhase("done");
+            setProgress(100);
+            setPeerResult(result);
+            sessionStorage.removeItem("polaris_restore");
+            return;
+          }
+        }
+      } catch {}
+    }
+    const q = searchParams.get("q");
+    if (q) {
+      setQuery(q);
+      setPendingQuery(q);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A 級重跑：runQuery 的公司辨識吃 companies、期別 fallback 吃 fiscalPeriod（BQ 期別載入後才有值），
+  // 兩者就緒才執行，否則會靜默 no-op（辨識不到公司就 return）
+  useEffect(() => {
+    if (!pendingQuery || companies.length === 0 || !fiscalPeriod) return;
+    const q = pendingQuery;
+    setPendingQuery(null);
+    runQuery(q);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingQuery, companies, fiscalPeriod]);
 
   // 初始化：dbPeriods 從 BQ 載入後，若 fiscalPeriod 還是空（未選過）就設成最新期別
   useEffect(() => {

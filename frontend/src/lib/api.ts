@@ -136,6 +136,8 @@ export const api = {
           id: h.id as string,
           query: h.query as string,
           page: (h.origin ?? "research") as "research" | "peer",
+          // Firestore auto-id 解析不出時間，分組要靠 created_at 換算的 ts
+          ts: h.created_at && !isNaN(Date.parse(h.created_at)) ? Date.parse(h.created_at) : undefined,
           time: h.created_at
             ? new Date(h.created_at).toLocaleString("zh-TW", {
                 timeZone: "Asia/Taipei", year: "numeric", month: "2-digit",
