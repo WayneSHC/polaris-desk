@@ -119,23 +119,39 @@ function ResearchPageInner() {
   const [ctxOpen, setCtxOpen] = useState(true);
   const [kpiShowAll, setKpiShowAll] = useState(false);
 
-  // B 級還原：從 history 頁點進來時，讀 sessionStorage 直接復原結果
+  // B 級還原：從 history 頁點進來時，讀 sessionStorage 直接復原結果；
+  // 還原不成（localStorage 紀錄無整包 result、或刷新後 sessionStorage 已清）
+  // 退回 A 級：帶 ?q= 自動重跑一次查詢，不再停在空白初始頁
+  const historyEntryConsumedRef = useRef(false);
   useEffect(() => {
+    // 冪等 guard：restore 分支會消耗掉 sessionStorage，effect 重跑（dev StrictMode）
+    // 時第二次會誤入 q 分支、拿 API 重跑蓋掉剛還原的結果
+    if (historyEntryConsumedRef.current) return;
+    historyEntryConsumedRef.current = true;
     const historyId = searchParams.get("historyId");
-    if (!historyId) return;
-    try {
-      const raw = sessionStorage.getItem("polaris_restore");
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.id !== historyId) return;
-      setQuery(saved.query ?? "");
-      setHasQueried(true);
-      setPhase("done");
-      setProgress(100);
-      setRestoredData(saved.result);
-      setRestoredAt(saved.time ?? null);
-      sessionStorage.removeItem("polaris_restore");
-    } catch {}
+    if (historyId) {
+      try {
+        const raw = sessionStorage.getItem("polaris_restore");
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.id === historyId) {
+            setQuery(saved.query ?? "");
+            setHasQueried(true);
+            setPhase("done");
+            setProgress(100);
+            setRestoredData(saved.result);
+            setRestoredAt(saved.time ?? null);
+            sessionStorage.removeItem("polaris_restore");
+            return;
+          }
+        }
+      } catch {}
+    }
+    const q = searchParams.get("q");
+    if (q) {
+      setQuery(q);
+      run(q);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
